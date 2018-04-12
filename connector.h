@@ -42,8 +42,10 @@ typedef struct{
     char modem_type[32];
     char input_directory[1024];
     char output_directory[1024];
+    bool connected;
 
 // private
+    bool waiting_for_connection;
     buffer in_buffer;
     buffer out_buffer;
     int data_socket;

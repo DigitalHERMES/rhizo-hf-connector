@@ -153,6 +153,9 @@ int main (int argc, char *argv[])
         }
     }
 
+    connector.connected = false;
+    connector.waiting_for_connection = false;
+
     pthread_t tid[3];
 
     pthread_create(&tid[0], NULL, spool_input_directory_thread, (void *) &connector);

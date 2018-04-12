@@ -18,7 +18,7 @@ For VARA modem, on gateway side (set VARA to ports 8300 / 8301):
 
 On client side (ports to 8400/8401):
 
-   $ connector -r vara -i r1/ -o r2/ -c UU2UUU -d PP2PPP -s TX -a 127.0.0.1 -p 8400
+    $ connector -r vara -i r1/ -o r2/ -c UU2UUU -d PP2PPP -s TX -a 127.0.0.1 -p 8400
 
 ### Ardop
 

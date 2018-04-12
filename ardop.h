@@ -20,6 +20,16 @@
  * Ardop support routines
  */
 
+/**
+ * @file ardop.h
+ * @author Rafael Diniz
+ * @date 12 Apr 2018
+ * @brief Ardop modem support functions
+ *
+ * All the specific code for supporting Ardop.
+ *
+ */
+
 #ifndef HAVE_ARDOP_H__
 #define HAVE_ARDOP_H__
 
