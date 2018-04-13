@@ -60,7 +60,7 @@ bool write_message_to_buffer(char *msg_path, rhizo_conn *connector){
     while ((read_count = fread(buffer, 1, sizeof(buffer), f_in)) > 0){
         total_read += read_count;
 
-        fprintf(stderr, "writing to buffer msg of size %u tx now: %lu\n", msg_size, read_count);
+//        fprintf(stderr, "writing to buffer msg of size %u tx now: %lu\n", msg_size, read_count);
         write_buffer(&connector->in_buffer, buffer, read_count);
     }
 
@@ -128,7 +128,6 @@ void *spool_output_directory_thread(void *conn)
     msg_counter = higher_previous_message + 1;
 
     while (true){
-        fprintf(stderr, "writing millions of files %u\n", msg_counter);
         strcpy(msg_path, connector->output_directory);
         sprintf(msg_path+strlen(msg_path), "msg-%010u.txt", msg_counter);
         msg_counter++;
@@ -203,8 +202,8 @@ void *spool_input_directory_thread(void *conn)
         }
 
     }
-    (void) inotify_rm_watch(fd, wd);
-    (void) close(fd);
+    inotify_rm_watch(fd, wd);
+    close(fd);
 
     fprintf(stderr, "Spool is finishing...\n");
 

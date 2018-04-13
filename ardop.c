@@ -105,31 +105,37 @@ void *ardop_data_worker_thread_tx(void *conn)
 void *ardop_data_worker_thread_rx(void *conn)
 {
     rhizo_conn *connector = (rhizo_conn *) conn;
-    size_t len;
     uint8_t buffer[MAX_ARDOP_PACKET];
     uint32_t buf_size; // our header is 4 bytes long
     uint8_t ardop_size[2];
 
     while(true){
-        len = recv(connector->data_socket, &ardop_size, sizeof(ardop_size), 0);
-        if (len != sizeof(ardop_size))
-            fprintf(stderr, "data_worker_thread_rx: socket read error.\n");
 
-// ARDOP frame TNC data format
+        if ( !tcp_read(connector->data_socket, ardop_size, 2) ){
+            fprintf(stderr, "Error in tcp_read.\n");
+            // bailing down
+        }
+
+        // ARDOP TNC data format - length 2 bytes
         buf_size = ardop_size[0];
         buf_size <<= 8;
         buf_size |= ardop_size[1];
 
-// decreate this... make a loop which allows a smaller recv size
-        len = recv(connector->data_socket, buffer, buf_size, 0);
-        if (len != buf_size)
-            fprintf(stderr, "data_worker_thread_rx: socket read error.\n");
 
+        if ( !tcp_read(connector->data_socket, buffer, buf_size) ){
+            fprintf(stderr, "Error in tcp_read.\n");
+            // bailing down
+        }
+
+        if (buf_size > 3 && !memcmp("ARQ", buffer,  3)){
+
+            buf_size -= 3;
 //        fprintf(stderr, "received from ardop: %s\n", (char *) buffer);
-        // write header
-        write_buffer(&connector->out_buffer, (uint8_t *) &buf_size, sizeof(buf_size));
+            // write header
+            write_buffer(&connector->out_buffer, (uint8_t *) &buf_size, sizeof(buf_size));
         // write to buffer
-        write_buffer(&connector->out_buffer, buffer, len);
+            write_buffer(&connector->out_buffer, buffer + 3, buf_size);
+        }
     }
 
     return EXIT_SUCCESS;
@@ -138,17 +144,15 @@ void *ardop_data_worker_thread_rx(void *conn)
 void *ardop_control_worker_thread_rx(void *conn)
 {
     rhizo_conn *connector = (rhizo_conn *) conn;
-    size_t len;
     uint8_t rcv_byte;
     uint8_t buffer[1024];
     int counter = 0;
     bool new_cmd = false;
 
     while(true){
-        len = recv(connector->control_socket, &rcv_byte, 1, 0);
-        if (len < 1){
-            fprintf(stderr, "control_worker_thread_rx: socket read error.\n");
-            // goto die; // ?
+        if (!tcp_read(connector->control_socket, &rcv_byte, 1)){
+                fprintf(stderr, "control_worker_thread_rx: socket read error.\n");
+                // goto die; // ?
         }
 
         if (rcv_byte == '\r'){

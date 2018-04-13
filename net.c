@@ -40,6 +40,8 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
+#include "net.h"
+
 bool tcp_connect(char *ip, int port, int *sockt){
     struct sockaddr_in ardop_addr;
 
@@ -56,6 +58,25 @@ bool tcp_connect(char *ip, int port, int *sockt){
     memset(ardop_addr.sin_zero, 0, sizeof(ardop_addr.sin_zero));
 
     connect(*sockt, (struct sockaddr *) &ardop_addr, sizeof(ardop_addr));
+
+    return true;
+}
+
+bool tcp_read(int sockt, uint8_t *buffer, size_t rx_size){
+    ssize_t len;
+    size_t rcv_counter = 0;
+
+    while (rcv_counter < rx_size){
+        int trx_size = (rx_size - rcv_counter > TCP_BLOCK)? TCP_BLOCK : rx_size - rcv_counter;
+
+        len = recv(sockt, buffer + rcv_counter, trx_size, 0);
+        if (len == 0){
+            fprintf(stderr, "tcp_read: socket read error.\n");
+            return false;
+        }
+        rcv_counter += len;
+
+    }
 
     return true;
 }
