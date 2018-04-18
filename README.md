@@ -1,12 +1,14 @@
-# Rhizo-connector
+# Rhizo-HF-connector
 
-  Rhizo-connector is a file exchange solution for HF trx.
+  Rhizo-HF-connector is a file exchange solution compatible with different
+  HF modems.
 
-  Currently, rhizo-connector sends messages which are placed inside an input
-  directory, and writes messages to an output directory, using a HF TNC as
-  channel.
+  Currently, Rhizo-HF-connector sends messages which are placed inside an input
+  directory, and writes received messages to an output directory, using a HF
+  modem as channel.
 
-  Planned support for the following modems: VARA, Ardop and D-Star TNCs.
+  Planned support for the following modems: VARA, Ardop and D-Star (DV low
+  speed data).
 
 ## Usage
 
@@ -14,11 +16,11 @@
 
 For VARA modem, on gateway side (set VARA to ports 8300 / 8301):
 
-    $ connector -r vara -i l1/ -o l2/ -c PP2PPP -d UU2UUU -s RX -a 127.0.0.1 -p 8300
+    $ rz-hf-connector -r vara -i l1/ -o l2/ -c PP2PPP -d UU2UUU -s RX -a 127.0.0.1 -p 8300
 
 On client side (ports to 8400/8401):
 
-    $ connector -r vara -i r1/ -o r2/ -c UU2UUU -d PP2PPP -s TX -a 127.0.0.1 -p 8400
+    $ rz-hf-connector -r vara -i r1/ -o r2/ -c UU2UUU -d PP2PPP -s TX -a 127.0.0.1 -p 8400
 
 ### Ardop
 
@@ -32,9 +34,9 @@ In the other site (ports 8515/8516):
 
 And rhizo-connector:
 
-    $ connector -r ardop -i l1/ -o l2/ -c PP2UIT -d BB2UIT -s RX -a 127.0.0.1 -p 8515
+    $ rz-hf-connector -r ardop -i l1/ -o l2/ -c PP2UIT -d BB2UIT -s RX -a 127.0.0.1 -p 8515
 
-    $ connector -r ardop -i r1/ -o r2/ -c BB2UIT -d PP2UIT -s TX -a 127.0.0.1 -p 8517
+    $ rz-hf-connector -r ardop -i r1/ -o r2/ -c BB2UIT -d PP2UIT -s TX -a 127.0.0.1 -p 8517
 
 
 ### D-Star

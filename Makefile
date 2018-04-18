@@ -23,7 +23,7 @@ PREFIX=/usr
 CC=gcc
 CFLAGS=-g -Wall -std=gnu11 -pthread
 
-all: connector
+all: rz-hf-connector
 
 #connector: connector.c connector.h ring_buffer.c ring_buffer.h buffer.c \
 #	buffer.h spool.c spool.h vara.c vara.h dstar.c dstar.h ardop.c ardop.h
@@ -32,12 +32,12 @@ all: connector
 
 objects := $(patsubst %.c,%.o,$(wildcard *.c))
 
-connector : $(objects)
-	$(CC) $(CFLAGS) -o connector $(objects)
+rz-hf-connector : $(objects)
+	$(CC) $(CFLAGS) -o rz-hf-connector $(objects)
 
 install:
-	install connector $(PREFIX)/bin
+	install rz-hf-connector $(PREFIX)/bin
 
 
 clean:
-	rm -f connector *.o *~
+	rm -f rz-hf-connector *.o *~
