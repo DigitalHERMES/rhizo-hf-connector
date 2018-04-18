@@ -20,6 +20,16 @@
  * Vara support routines
  */
 
+/**
+ * @file vara.c
+ * @author Rafael Diniz
+ * @date 12 Apr 2018
+ * @brief VARA modem support functions
+ *
+ * All the specific code for supporting VARA.
+ *
+ */
+
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
@@ -30,6 +40,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
+#include "net.h"
 #include "vara.h"
 
 // transfering 1 byte at time
@@ -42,6 +53,11 @@ void *vara_data_worker_thread_tx(void *conn)
     uint8_t buffer[TRX_BLK_SIZE];
 
     while(true){
+        if (connector->connected == false){
+            sleep(1);
+            continue;
+        }
+
         memset(buffer, 0, sizeof(buffer));
         read_buffer(&connector->in_buffer, buffer, TRX_BLK_SIZE);
         len = send(connector->data_socket, buffer, TRX_BLK_SIZE, 0);
@@ -68,85 +84,108 @@ void *vara_data_worker_thread_rx(void *conn)
 
 }
 
-void *vara_control_worker_thread(void *conn)
+void *vara_control_worker_thread_rx(void *conn)
 {
     rhizo_conn *connector = (rhizo_conn *) conn;
-    size_t len;
-    char buffer[1024];
+    uint8_t rcv_byte;
+    uint8_t buffer[1024];
+    int counter = 0;
+    bool new_cmd = false;
 
     while(true){
-        len = recv(connector->control_socket, buffer, TRX_BLK_SIZE, 0);
+        if (!tcp_read(connector->control_socket, &rcv_byte, 1)){
+                fprintf(stderr, "control_worker_thread_rx: socket read error.\n");
+                // goto die; // ?
+        }
 
-        if (len > 0){
-            if (buffer[0] == '\r'){
-                fprintf(stderr, "\n");
-            }
-            else{
-                fprintf(stderr, "%c", buffer[0]);
+        if (rcv_byte == '\r'){
+            buffer[counter] = 0;
+            counter = 0;
+            new_cmd = true;
+        }
+        else{
+            buffer[counter] = rcv_byte;
+            counter++;
+            new_cmd = false;
+        }
+
+        if (new_cmd){
+            if (!strcmp((char *) buffer, "DISCONNECTED")){
+                fprintf(stderr, "TNC: %s\n", buffer);
+                connector->connected = false;
+                connector->waiting_for_connection = false;
+            } else
+            // other commands here
+            if (!memcmp(buffer, "CONNECTED", strlen("CONNECTED"))){
+                fprintf(stderr, "TNC: %s\n", buffer);
+                connector->connected = true;
+            } else
+            if (!memcmp(buffer, "PTT", strlen("PTT"))){
+                // supressed output
+                // fprintf(stderr, "%s -- CMD NOT CONSIDERED!!\n", buffer);
+            } else {
+                fprintf(stderr, "%s -- CMD NOT CONSIDERED!!\n", buffer);
             }
         }
-        else
-            fprintf(stderr, "control_worker_thread: read error.\n");
     }
 
+    return EXIT_SUCCESS;
 }
 
-bool initialize_modem_vara(rhizo_conn *connector){
+void *vara_control_worker_thread_tx(void *conn)
+{
+    rhizo_conn *connector = (rhizo_conn *) conn;
     char buffer[1024];
-    struct sockaddr_in vara_addr;
-    socklen_t addr_size;
-
-    connector->control_socket = socket(PF_INET, SOCK_STREAM, 0);
-
-    vara_addr.sin_family = AF_INET;
-    vara_addr.sin_port = htons(connector->tcp_base_port);
-    vara_addr.sin_addr.s_addr = inet_addr(connector->ip_address);
-
-    memset(vara_addr.sin_zero, 0, sizeof(vara_addr.sin_zero));
-
-    addr_size = sizeof vara_addr;
-    connect(connector->control_socket, (struct sockaddr *) &vara_addr, addr_size);
-
-    // we start our control thread
-    pthread_t tid1;
-    pthread_create(&tid1, NULL, vara_control_worker_thread, (void *) connector);
 
     // We set a call sign
     memset(buffer,0,sizeof(buffer));
     sprintf(buffer, "MYCALL %s\r", connector->call_sign);
     send(connector->control_socket, buffer, strlen(buffer), 0);
 
-    if (connector->mode == MODE_RX){
-        memset(buffer,0,sizeof(buffer));
-        strcpy(buffer,"LISTEN ON\r");
-        send(connector->control_socket,buffer,strlen(buffer),0);
+    memset(buffer,0,sizeof(buffer));
+    strcpy(buffer,"LISTEN ON\r");
+    send(connector->control_socket,buffer,strlen(buffer),0);
+
+    // 1Hz function
+    while(true){
+
+        // condition for connection: no connection AND something to transmitt
+        if (connector->connected == false &&
+            ring_buffer_count_bytes(&connector->in_buffer.buf) > 0 &&
+            !connector->waiting_for_connection){
+
+            // TODO: try to add some entropy in order to avoid on air clashes
+            memset(buffer,0,sizeof(buffer));
+            sprintf(buffer,"CONNECT %s %s\r", connector->call_sign,
+                    connector->remote_call_sign);
+            send(connector->control_socket,buffer,strlen(buffer),0);
+            connector->waiting_for_connection = true;
+        }
+
+        sleep(1);
+
     }
 
-    if (connector->mode == MODE_TX){
-        memset(buffer,0,sizeof(buffer));
-        sprintf(buffer,"CONNECT %s %s\r", connector->call_sign,
-               connector->remote_call_sign);
-        send(connector->control_socket,buffer,strlen(buffer),0);
-    }
+    return EXIT_SUCCESS;
+}
 
-    // now lets initialize the data port connection
-    connector->data_socket = socket(PF_INET, SOCK_STREAM, 0);
+bool initialize_modem_vara(rhizo_conn *connector){
+    tcp_connect(connector->ip_address, connector->tcp_base_port, &connector->control_socket);
+    tcp_connect(connector->ip_address, connector->tcp_base_port+1, &connector->data_socket);
 
-    vara_addr.sin_family = AF_INET;
-    vara_addr.sin_port = htons(connector->tcp_base_port+1);
-    vara_addr.sin_addr.s_addr = inet_addr(connector->ip_address);
+    // we start our control thread
+    pthread_t tid1;
+    pthread_create(&tid1, NULL, vara_control_worker_thread_rx, (void *) connector);
 
-    memset(vara_addr.sin_zero, 0, sizeof(vara_addr.sin_zero));
-
-    addr_size = sizeof vara_addr;
-    connect(connector->data_socket, (struct sockaddr *) &vara_addr, addr_size);
-
+    // we start our control tx thread
     pthread_t tid2;
-    pthread_create(&tid2, NULL, vara_data_worker_thread_tx, (void *) connector);
+    pthread_create(&tid2, NULL, vara_control_worker_thread_tx, (void *) connector);
+
+    pthread_t tid3;
+    pthread_create(&tid3, NULL, vara_data_worker_thread_tx, (void *) connector);
 
     // just to block, we dont create a new thread here
     vara_data_worker_thread_rx((void *) connector);
-
 
     return true;
 }

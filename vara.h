@@ -20,6 +20,16 @@
  * Vara support routines
  */
 
+/**
+ * @file vara.h
+ * @author Rafael Diniz
+ * @date 12 Apr 2018
+ * @brief VARA modem support functions
+ *
+ * All the specific code for supporting VARA.
+ *
+ */
+
 #ifndef HAVE_VARA_H__
 #define HAVE_VARA_H__
 
