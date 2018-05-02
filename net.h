@@ -42,8 +42,8 @@ extern "C" {
 #define TCP_BLOCK 512
 
 bool tcp_connect(char *ip, int port, int *sockt);
-
 bool tcp_read(int sockt, uint8_t *buffer, size_t rx_size);
+bool tcp_write(int sockt, uint8_t *buffer, size_t rx_size);
 
 #ifdef __cplusplus
 };

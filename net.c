@@ -75,7 +75,16 @@ bool tcp_read(int sockt, uint8_t *buffer, size_t rx_size){
             return false;
         }
         rcv_counter += len;
+    }
 
+    return true;
+}
+
+bool tcp_write(int sockt, uint8_t *buffer, size_t tx_size){
+    size_t len = send(sockt, buffer, tx_size, 0);
+    if (len != tx_size) {
+        fprintf(stderr, "tcp_write: socket write error.\n");
+        return false;
     }
 
     return true;

@@ -60,8 +60,8 @@ bool write_message_to_buffer(char *msg_path, rhizo_conn *connector){
     while ((read_count = fread(buffer, 1, sizeof(buffer), f_in)) > 0){
         total_read += read_count;
 
-//        fprintf(stderr, "writing to buffer msg of size %u tx now: %lu\n", msg_size, read_count);
-        write_buffer(&connector->in_buffer, buffer, read_count);
+       fprintf(stderr, "writing to buffer msg of size %u tx now: %lu\n", msg_size, read_count);
+       write_buffer(&connector->in_buffer, buffer, read_count);
     }
 
     if (total_read != msg_size){
@@ -74,9 +74,8 @@ bool write_message_to_buffer(char *msg_path, rhizo_conn *connector){
 }
 
 bool read_message_from_buffer(char *msg_path, rhizo_conn *connector){
-        uint32_t total_count = 0;
         uint32_t msg_size = 0;
-        uint8_t buffer[BUFFER_SIZE];
+        uint8_t *buffer;
 
         read_buffer(&connector->out_buffer, (uint8_t *) &msg_size, sizeof(msg_size));
 
@@ -88,15 +87,14 @@ bool read_message_from_buffer(char *msg_path, rhizo_conn *connector){
             return false;
         }
 
-        while(total_count < msg_size){
-            read_buffer(&connector->out_buffer, buffer, 1);
-            fwrite(buffer, 1, 1, fp);
-            total_count += 1;
-        }
+        fprintf(stderr, "writing file\n");
+
+        buffer = (uint8_t *) malloc(msg_size);
+        read_buffer(&connector->out_buffer, buffer, msg_size);
+        fwrite(buffer, 1, msg_size, fp);
+        free(buffer);
 
         fclose(fp);
-
-        // TODO: send ACK in order file can be deleted in the other end
 
         return true;
 }

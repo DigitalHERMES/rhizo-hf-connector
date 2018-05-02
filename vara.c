@@ -48,21 +48,25 @@
 
 void *vara_data_worker_thread_tx(void *conn)
 {
-   rhizo_conn *connector = (rhizo_conn *) conn;
-    size_t len;
-    uint8_t buffer[TRX_BLK_SIZE];
+    rhizo_conn *connector = (rhizo_conn *) conn;
+    uint8_t *buffer;
+    uint32_t buf_size;
 
     while(true){
-        if (connector->connected == false){
+        read_buffer(&connector->in_buffer, (uint8_t *) &buf_size, sizeof(buf_size)); // TODO: if the two parties in a connection have different endianess, we are in trouble
+
+        buffer = (uint8_t *) malloc (buf_size);
+        memset(buffer, 0, buf_size);
+        read_buffer(&connector->in_buffer, buffer, buf_size);
+
+        while (connector->connected == false){
             sleep(1);
-            continue;
         }
 
-        memset(buffer, 0, sizeof(buffer));
-        read_buffer(&connector->in_buffer, buffer, TRX_BLK_SIZE);
-        len = send(connector->data_socket, buffer, TRX_BLK_SIZE, 0);
-        if (len != TRX_BLK_SIZE)
-            fprintf(stderr, "data_worker_thread: socket write error.\n");
+        tcp_write(connector->data_socket, (uint8_t *) &buf_size, sizeof(buf_size) );
+        tcp_write(connector->data_socket, buffer, buf_size);
+
+        free(buffer);
     }
 
 }
@@ -70,16 +74,25 @@ void *vara_data_worker_thread_tx(void *conn)
 void *vara_data_worker_thread_rx(void *conn)
 {
     rhizo_conn *connector = (rhizo_conn *) conn;
-    size_t len;
-    uint8_t buffer[TRX_BLK_SIZE];
+    uint8_t *buffer;
+    uint32_t buf_size;
 
     while(true){
-        len = recv(connector->data_socket, buffer, TRX_BLK_SIZE, 0);
-        // write to buffer
-        if (len > 0)
-            write_buffer(&connector->out_buffer, buffer, len);
-        else
-            fprintf(stderr, "data_worker_thread: socket read error.\n");
+        while (connector->connected == false){
+            sleep(1);
+        }
+        tcp_read(connector->data_socket, (uint8_t *) &buf_size, sizeof(buf_size));
+
+        buffer = (uint8_t *) malloc (buf_size);
+        memset(buffer, 0, buf_size);
+        tcp_read(connector->data_socket, buffer, buf_size);
+
+        fprintf(stderr,"Message of size: %u received.\n", buf_size);
+
+        write_buffer(&connector->out_buffer, (uint8_t *) &buf_size, sizeof(buf_size));
+        write_buffer(&connector->out_buffer, buffer, buf_size);
+
+        free(buffer);
     }
 
 }

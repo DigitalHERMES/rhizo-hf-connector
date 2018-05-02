@@ -49,55 +49,43 @@
 void *ardop_data_worker_thread_tx(void *conn)
 {
     rhizo_conn *connector = (rhizo_conn *) conn;
-    size_t len;
-    uint8_t buffer[MAX_ARDOP_PACKET];
+    uint8_t *buffer;
     uint32_t buf_size; // our header is 4 bytes long
     uint8_t ardop_size[2];
+    uint32_t packet_size;
 
-    uint32_t counter;
     while(true){
-        if (connector->connected == false){
+        // check if we are connected, otherwise, wait
+        while (connector->connected == false){
             sleep(1);
-            continue;
         }
-
-        memset(buffer, 0, sizeof(buffer));
         // read header
         read_buffer(&connector->in_buffer, (uint8_t *) &buf_size, sizeof(buf_size)); // TODO: if the two parties in a connection have different endianess, we are in trouble
 
-        counter = buf_size;
-        while (counter > MAX_ARDOP_PACKET){
-            read_buffer(&connector->in_buffer, buffer, MAX_ARDOP_PACKET);
+        fprintf(stderr, "msg size: %u \n", buf_size);
 
-            ardop_size[0] = 255;
-            ardop_size[1] = 255;
+        buffer = (uint8_t *) malloc(buf_size);
+        memset(buffer, 0, buf_size);
+        read_buffer(&connector->in_buffer, buffer, buf_size);
 
-            len = send(connector->data_socket, ardop_size, sizeof(ardop_size), 0);
-            if (len != sizeof(ardop_size))
-                fprintf(stderr, "data_worker_thread_tx: socket write error.\n");
+        packet_size = buf_size + 4; // added our 4 bytes header with length
 
-            len = send(connector->data_socket, buffer, MAX_ARDOP_PACKET, 0);
-            if (len != MAX_ARDOP_PACKET)
-                fprintf(stderr, "data_worker_thread_tx: socket write error.\n");
-
-            counter -= MAX_ARDOP_PACKET;
-
-            fprintf(stderr, "Transmitting Data!");
+        if (packet_size > 65535){ // (2 ^ 16)  // ardop packet has 16 bits/2 bytes of size
+            free(buffer);
+            fprintf(stderr, "Message bigger then max ardop packet. TODO: implement split packet tx!\n");
+            continue;
         }
 
-        read_buffer(&connector->in_buffer, buffer, counter);
+        //fprintf(stderr, "aqui 2 \n");
 
-        ardop_size[0] = (uint8_t) (counter >> 8);
-        ardop_size[1] = (uint8_t) (counter & 255);
+        ardop_size[0] = (uint8_t) (packet_size >> 8);
+        ardop_size[1] = (uint8_t) (packet_size & 255);
 
-        len = send(connector->data_socket, ardop_size, sizeof(ardop_size), 0);
-        if (len != sizeof(ardop_size))
-            fprintf(stderr, "data_worker_thread_tx: socket write error.\n");
+        tcp_write(connector->data_socket, ardop_size, sizeof(ardop_size));
+        tcp_write(connector->data_socket, (uint8_t *) &buf_size, sizeof(buf_size) );
+        tcp_write(connector->data_socket, buffer, buf_size);
 
-        len = send(connector->data_socket, buffer, counter, 0);
-        if (len != counter)
-                fprintf(stderr, "data_worker_thread_tx: socket write error.\n");
-
+        free(buffer);
     }
 
 }
@@ -110,30 +98,24 @@ void *ardop_data_worker_thread_rx(void *conn)
     uint8_t ardop_size[2];
 
     while(true){
-
-        if ( !tcp_read(connector->data_socket, ardop_size, 2) ){
-            fprintf(stderr, "Error in tcp_read.\n");
-            // bailing down
+        while (connector->connected == false){
+            sleep(1);
         }
 
-        // ARDOP TNC data format - length 2 bytes
+        tcp_read(connector->data_socket, ardop_size, 2);
+
+        // ARDOP TNC data format: length 2 bytes | payload
+        buf_size = 0;
         buf_size = ardop_size[0];
         buf_size <<= 8;
         buf_size |= ardop_size[1];
 
+        tcp_read(connector->data_socket, buffer, buf_size);
 
-        if ( !tcp_read(connector->data_socket, buffer, buf_size) ){
-            fprintf(stderr, "Error in tcp_read.\n");
-            // bailing down
-        }
+        fprintf(stderr,"Message of size: b1: %d b2: %d  translated: %u received.\n", ardop_size[0], ardop_size[1],  buf_size);
 
         if (buf_size > 3 && !memcmp("ARQ", buffer,  3)){
-
             buf_size -= 3;
-//        fprintf(stderr, "received from ardop: %s\n", (char *) buffer);
-            // write header
-            write_buffer(&connector->out_buffer, (uint8_t *) &buf_size, sizeof(buf_size));
-        // write to buffer
             write_buffer(&connector->out_buffer, buffer + 3, buf_size);
         }
     }
@@ -150,10 +132,7 @@ void *ardop_control_worker_thread_rx(void *conn)
     bool new_cmd = false;
 
     while(true){
-        if (!tcp_read(connector->control_socket, &rcv_byte, 1)){
-                fprintf(stderr, "control_worker_thread_rx: socket read error.\n");
-                // goto die; // ?
-        }
+        tcp_read(connector->control_socket, &rcv_byte, 1);
 
         if (rcv_byte == '\r'){
             buffer[counter] = 0;
@@ -165,26 +144,41 @@ void *ardop_control_worker_thread_rx(void *conn)
             counter++;
             new_cmd = false;
         }
-// treat "STATUS CONNECT TO PP2UIT FAILED!" 
+
+// treat "STATUS CONNECT TO PP2UIT FAILED!" ?
 // and reset waiting for connection!
+
         if (new_cmd){
-            if (!strcmp((char *) buffer, "DISCONNECTED")){
+            if (!memcmp(buffer, "DISCONNECTED", strlen("DISCONNECTED"))){
                 fprintf(stderr, "TNC: %s\n", buffer);
                 connector->connected = false;
                 connector->waiting_for_connection = false;
             } else
-            // other commands here
+            if (!memcmp(buffer, "NEWSTATE DISC", strlen("NEWSTATE DISC"))){
+                fprintf(stderr, "TNC: %s\n", buffer);
+                connector->connected = false;
+                connector->waiting_for_connection = false;
+            } else
             if (!memcmp(buffer, "CONNECTED", strlen("CONNECTED"))){
                 fprintf(stderr, "TNC: %s\n", buffer);
                 connector->connected = true;
+                connector->waiting_for_connection = false;
             } else
             if (!memcmp(buffer, "PTT", strlen("PTT"))){
                 // supressed output
                 // fprintf(stderr, "%s -- CMD NOT CONSIDERED!!\n", buffer);
             } else
+            if (!memcmp(buffer, "BUFFER", strlen("BUFFER"))){
+                uint32_t buf_size;
+                sscanf( (char *) buffer, "BUFFER %u", &buf_size);
+                fprintf(stderr, "BUFFER: %u\n", buf_size);
+                if (buf_size == 0){
+                    // fprintf(stderr, "Message sent\n");
+                }
+            } else
             if (!memcmp(buffer, "INPUTPEAKS", strlen("INPUTPEAKS"))){
-
-            } else{
+                // suppressed output
+            } else {
                 fprintf(stderr, "%s -- CMD NOT CONSIDERED!!\n", buffer);
             }
         }
@@ -202,38 +196,47 @@ void *ardop_control_worker_thread_tx(void *conn)
 
     memset(buffer,0,sizeof(buffer));
     sprintf(buffer, "INITIALIZE\r");
-    send(connector->control_socket, buffer, strlen(buffer), 0);
+    tcp_write(connector->control_socket, buffer, strlen(buffer));
 
     // We set a call sign
     memset(buffer,0,sizeof(buffer));
     sprintf(buffer, "MYCALL %s\r", connector->call_sign);
-    send(connector->control_socket, buffer, strlen(buffer), 0);
+    tcp_write(connector->control_socket, buffer, strlen(buffer));
 
     // for initial development, set arq timeout to 4min
     memset(buffer,0,sizeof(buffer));
     sprintf(buffer, "ARQTIMEOUT 240\r");
-    send(connector->control_socket, buffer, strlen(buffer), 0);
+    tcp_write(connector->control_socket, buffer, strlen(buffer));
 
     memset(buffer,0,sizeof(buffer));
     strcpy(buffer,"LISTEN True\r");
-    send(connector->control_socket,buffer,strlen(buffer),0);
+    tcp_write(connector->control_socket, buffer, strlen(buffer));
 
     // 1Hz function
     while(true){
 
         // condition for connection: no connection AND something to transmitt
+//        fprintf(stderr, "Connection loop conn: %d buf_cnt: %ld wait_conn %d \n", connector->connected, ring_buffer_count_bytes(&connector->in_buffer.buf), connector->waiting_for_connection);
         if (connector->connected == false &&
             ring_buffer_count_bytes(&connector->in_buffer.buf) > 0 &&
             !connector->waiting_for_connection){
 
-            // TODO: try to add some entropy in order to avoid on air clashes
+            fprintf(stderr, "Entrou na funcao de conexao\n");
+
+#if 0
+            // some entropy added
+            if (connector->mode == MODE_RX){
+                sleep (6);
+                if (connector->connected == true){
+                    continue;
+                }
+            }
+#endif
             memset(buffer,0,sizeof(buffer));
             sprintf(buffer,"ARQCALL %s 5\r", connector->remote_call_sign);
             send(connector->control_socket,buffer,strlen(buffer),0);
             connector->waiting_for_connection = true;
         }
-
-
         sleep(1);
 
     }

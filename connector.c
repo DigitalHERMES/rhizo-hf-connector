@@ -107,7 +107,7 @@ int main (int argc, char *argv[])
         fprintf(stderr, " -c callsign                        Station Callsign (Eg: PU2HFF).\n");
         fprintf(stderr, " -d remote_callsign           Remote Station Callsign.\n");
         fprintf(stderr, " -a tnc_ip_address            IP address of the TNC,\n");
-        fprintf(stderr, " -p tcp_base_port              TCP base port of the TNC. In VARA, for example, ports tcp_base_port and tcp_base_port+1 are used,\n");
+        fprintf(stderr, " -p tcp_base_port              TCP base port of the TNC. For VARA and ARDOP ports tcp_base_port and tcp_base_port+1 are used,\n");
         fprintf(stderr, " -s initial_state                 Initial modem state: RX, TX.");
         fprintf(stderr, " -h                          Prints this help.\n");
         exit(EXIT_FAILURE);
@@ -161,8 +161,8 @@ int main (int argc, char *argv[])
     pthread_create(&tid[0], NULL, spool_input_directory_thread, (void *) &connector);
     pthread_create(&tid[1], NULL, spool_output_directory_thread, (void *) &connector);
 
-    modem_thread((void *) &connector);
     // pthread_create(&tid[2], NULL, modem_thread, (void *) &connector);
+    modem_thread((void *) &connector);
 
     return EXIT_SUCCESS;
 }
