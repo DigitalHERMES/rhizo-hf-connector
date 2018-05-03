@@ -56,7 +56,7 @@ void *ardop_data_worker_thread_tx(void *conn)
 
     while(true){
         // check if we are connected, otherwise, wait
-        while (connector->connected == false){
+        while (connector->connected == false || ring_buffer_count_bytes(&connector->in_buffer.buf) == 0){
             sleep(1);
         }
         // read header
@@ -70,13 +70,13 @@ void *ardop_data_worker_thread_tx(void *conn)
 
         packet_size = buf_size + 4; // added our 4 bytes header with length
 
-        if (packet_size > 65535){ // (2 ^ 16)  // ardop packet has 16 bits/2 bytes of size
+        if (packet_size > 65535 - 3){ // (2 ^ 16)  // ardop packet has 16 bits/2 bytes of size and the 3 "ARQ"
             free(buffer);
             fprintf(stderr, "Message bigger then max ardop packet. TODO: implement split packet tx!\n");
             continue;
         }
 
-        //fprintf(stderr, "aqui 2 \n");
+        fprintf(stderr, "after other read \n");
 
         ardop_size[0] = (uint8_t) (packet_size >> 8);
         ardop_size[1] = (uint8_t) (packet_size & 255);
@@ -84,6 +84,8 @@ void *ardop_data_worker_thread_tx(void *conn)
         tcp_write(connector->data_socket, ardop_size, sizeof(ardop_size));
         tcp_write(connector->data_socket, (uint8_t *) &buf_size, sizeof(buf_size) );
         tcp_write(connector->data_socket, buffer, buf_size);
+
+        fprintf(stderr, "after all tcp_writes...\n");
 
         free(buffer);
     }
@@ -112,7 +114,7 @@ void *ardop_data_worker_thread_rx(void *conn)
 
         tcp_read(connector->data_socket, buffer, buf_size);
 
-        fprintf(stderr,"Message of size: b1: %d b2: %d  translated: %u received.\n", ardop_size[0], ardop_size[1],  buf_size);
+        fprintf(stderr,"Ardop message of size: %u received.\n", buf_size);
 
         if (buf_size > 3 && !memcmp("ARQ", buffer,  3)){
             buf_size -= 3;

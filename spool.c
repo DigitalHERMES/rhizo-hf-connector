@@ -64,6 +64,8 @@ bool write_message_to_buffer(char *msg_path, rhizo_conn *connector){
        write_buffer(&connector->in_buffer, buffer, read_count);
     }
 
+    fprintf(stderr, "End writing msg to buffer\n");
+
     if (total_read != msg_size){
         fprintf(stderr, "Warning: possible truncated message. FIXME! total_read = %u msg_size = %u\n", total_read, msg_size);
     }
