@@ -31,8 +31,9 @@ all: rz-hf-connector
 #	spool.c vara.c dstar.c ardop.c  -o connector
 
 objects := $(patsubst %.c,%.o,$(wildcard *.c))
+headers := $(*.h)
 
-rz-hf-connector : $(objects)
+rz-hf-connector : $(objects) $(headers)
 	$(CC) $(CFLAGS) -o rz-hf-connector $(objects)
 
 install:

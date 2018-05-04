@@ -86,8 +86,8 @@ int main (int argc, char *argv[])
     tmp_conn = &connector;
 
     // initialize our buffers
-    initialize_buffer(&connector.in_buffer, 20); // 1MB
-    initialize_buffer(&connector.out_buffer, 20); // 1MB
+    initialize_buffer(&connector.in_buffer, 26); // 64MB
+    initialize_buffer(&connector.out_buffer, 26); // 64MB
 
     // Catch Ctrl+C
     signal (SIGINT,finish);

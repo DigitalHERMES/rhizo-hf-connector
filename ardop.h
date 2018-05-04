@@ -42,7 +42,12 @@
 extern "C" {
 #endif
 
-#define MAX_ARDOP_PACKET 65535
+// Values got from testing....
+// #define MAX_ARDOP_PACKET 8182
+#define MAX_ARDOP_PACKET 4096
+
+// 2 bytes max
+#define MAX_ARDOP_PACKET_SAFE 65535
 
 bool initialize_modem_ardop(rhizo_conn *connector);
 

@@ -28,7 +28,6 @@
 extern "C" {
 #endif
 
-#define TRX_BLK_SIZE 1
 #define BUFFER_SIZE 8192
 
 void *spool_output_directory_thread(void *conn);

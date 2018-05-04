@@ -52,6 +52,8 @@ bool write_message_to_buffer(char *msg_path, rhizo_conn *connector){
     stat(msg_path, &st);
     msg_size = (uint32_t) st.st_size;
 
+    fprintf(stderr, "Loaded message from spool driver %s %u.\n", msg_path, msg_size);
+
     // our 4 byte header which contains the size of the message
     write_buffer(&connector->in_buffer, (uint8_t *) &msg_size, sizeof(msg_size));
 
@@ -60,11 +62,9 @@ bool write_message_to_buffer(char *msg_path, rhizo_conn *connector){
     while ((read_count = fread(buffer, 1, sizeof(buffer), f_in)) > 0){
         total_read += read_count;
 
-       fprintf(stderr, "writing to buffer msg of size %u tx now: %lu\n", msg_size, read_count);
+        // fprintf(stderr, "writing to buffer msg of size %u tx now: %lu\n", msg_size, read_count);
        write_buffer(&connector->in_buffer, buffer, read_count);
     }
-
-    fprintf(stderr, "End writing msg to buffer\n");
 
     if (total_read != msg_size){
         fprintf(stderr, "Warning: possible truncated message. FIXME! total_read = %u msg_size = %u\n", total_read, msg_size);
@@ -77,11 +77,11 @@ bool write_message_to_buffer(char *msg_path, rhizo_conn *connector){
 
 bool read_message_from_buffer(char *msg_path, rhizo_conn *connector){
         uint32_t msg_size = 0;
-        uint8_t *buffer;
+        uint8_t buffer[BUFFER_SIZE];
 
         read_buffer(&connector->out_buffer, (uint8_t *) &msg_size, sizeof(msg_size));
 
-        fprintf(stderr, "Incoming message of size: %u\n", msg_size);
+        fprintf(stderr, "Incoming message going to spool driver %u\n", msg_size);
 
         FILE *fp = fopen (msg_path, "w");
         if (fp == NULL){
@@ -89,12 +89,19 @@ bool read_message_from_buffer(char *msg_path, rhizo_conn *connector){
             return false;
         }
 
-        fprintf(stderr, "writing file\n");
-
-        buffer = (uint8_t *) malloc(msg_size);
-        read_buffer(&connector->out_buffer, buffer, msg_size);
-        fwrite(buffer, 1, msg_size, fp);
-        free(buffer);
+        uint32_t counter = msg_size;
+        while (counter != 0){
+            if (counter > BUFFER_SIZE){
+                read_buffer(&connector->out_buffer, buffer, BUFFER_SIZE);
+                fwrite(buffer, 1, BUFFER_SIZE, fp);
+                counter -= BUFFER_SIZE;
+            }
+            else{
+                read_buffer(&connector->out_buffer, buffer, counter);
+                fwrite(buffer, 1, counter, fp);
+                counter -= counter;
+            }
+        }
 
         fclose(fp);
 
