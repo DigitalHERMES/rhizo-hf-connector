@@ -25,20 +25,17 @@ CFLAGS=-g -Wall -std=gnu11 -pthread
 
 all: rz-hf-connector
 
-#connector: connector.c connector.h ring_buffer.c ring_buffer.h buffer.c \
-#	buffer.h spool.c spool.h vara.c vara.h dstar.c dstar.h ardop.c ardop.h
-#	gcc -g -Wall -std=gnu99 -pthread connector.c ring_buffer.c buffer.c \
-#	spool.c vara.c dstar.c ardop.c  -o connector
+SRCS=$(wildcard *.c)
+OBJS=$(SRCS:.c=.o)
 
-objects := $(patsubst %.c,%.o,$(wildcard *.c))
-headers := $(*.h)
+%.o : %.c %.h
+	gcc -c $(CFLAGS) $< -o $@
 
-rz-hf-connector : $(objects) $(headers)
-	$(CC) $(CFLAGS) -o rz-hf-connector $(objects)
+rz-hf-connector : $(OBJS)
+	$(CC) $(CFLAGS) -o $@ $^
 
 install:
 	install rz-hf-connector $(PREFIX)/bin
-
 
 clean:
 	rm -f rz-hf-connector *.o *~

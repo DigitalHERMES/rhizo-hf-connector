@@ -53,15 +53,16 @@ void *vara_data_worker_thread_tx(void *conn)
     uint32_t buf_size;
 
     while(true){
+        // check if we are connected, otherwise, wait
+        while (connector->connected == false || ring_buffer_count_bytes(&connector->in_buffer.buf) == 0){
+            sleep(1);
+        }
+        // read header
         read_buffer(&connector->in_buffer, (uint8_t *) &buf_size, sizeof(buf_size)); // TODO: if the two parties in a connection have different endianess, we are in trouble
 
         buffer = (uint8_t *) malloc (buf_size);
         memset(buffer, 0, buf_size);
         read_buffer(&connector->in_buffer, buffer, buf_size);
-
-        while (connector->connected == false){
-            sleep(1);
-        }
 
         tcp_write(connector->data_socket, (uint8_t *) &buf_size, sizeof(buf_size) );
         tcp_write(connector->data_socket, buffer, buf_size);
@@ -132,12 +133,13 @@ void *vara_control_worker_thread_rx(void *conn)
             if (!memcmp(buffer, "CONNECTED", strlen("CONNECTED"))){
                 fprintf(stderr, "TNC: %s\n", buffer);
                 connector->connected = true;
+                connector->waiting_for_connection = false;
             } else
             if (!memcmp(buffer, "PTT", strlen("PTT"))){
                 // supressed output
                 // fprintf(stderr, "%s -- CMD NOT CONSIDERED!!\n", buffer);
             } else {
-                fprintf(stderr, "%s -- CMD NOT CONSIDERED!!\n", buffer);
+                fprintf(stderr, "%s\n", buffer);
             }
         }
     }
@@ -153,11 +155,11 @@ void *vara_control_worker_thread_tx(void *conn)
     // We set a call sign
     memset(buffer,0,sizeof(buffer));
     sprintf(buffer, "MYCALL %s\r", connector->call_sign);
-    send(connector->control_socket, buffer, strlen(buffer), 0);
+    tcp_write(connector->control_socket, (uint8_t *) buffer, strlen(buffer));
 
     memset(buffer,0,sizeof(buffer));
     strcpy(buffer,"LISTEN ON\r");
-    send(connector->control_socket,buffer,strlen(buffer),0);
+    tcp_write(connector->control_socket, (uint8_t *) buffer, strlen(buffer));
 
     // 1Hz function
     while(true){
@@ -171,7 +173,7 @@ void *vara_control_worker_thread_tx(void *conn)
             memset(buffer,0,sizeof(buffer));
             sprintf(buffer,"CONNECT %s %s\r", connector->call_sign,
                     connector->remote_call_sign);
-            send(connector->control_socket,buffer,strlen(buffer),0);
+            tcp_write(connector->control_socket, (uint8_t *)buffer, strlen(buffer));
             connector->waiting_for_connection = true;
         }
 

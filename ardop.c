@@ -68,6 +68,8 @@ void *ardop_data_worker_thread_tx(void *conn)
         memset(buffer, 0, buf_size);
         read_buffer(&connector->in_buffer, buffer, buf_size);
 
+        fprintf(stderr, "ardop_data_worker_thread_tx: After read buffer\n");
+
         packet_size = buf_size + 4; // added our 4 bytes header with length
 
         uint32_t counter = 0;
@@ -85,6 +87,8 @@ void *ardop_data_worker_thread_tx(void *conn)
 
            // ardop header
            tcp_write(connector->data_socket, ardop_size, sizeof(ardop_size));
+
+           fprintf(stderr, "ardop_data_worker_thread_tx: After ardop header tcp_write\n");
 
            if (tx_size == packet_size) { // first pass, we send our size header
                tcp_write(connector->data_socket, (uint8_t *) &buf_size, sizeof(buf_size) );
@@ -111,6 +115,7 @@ void *ardop_data_worker_thread_tx(void *conn)
                    tx_size -= tx_size;
                }
            }
+           fprintf(stderr, "ardop_data_worker_thread_tx: tcp_write %u\n", counter);
         }
 
         free(buffer);
@@ -211,7 +216,7 @@ void *ardop_control_worker_thread_rx(void *conn)
             if (!memcmp(buffer, "INPUTPEAKS", strlen("INPUTPEAKS"))){
                 // suppressed output
             } else {
-                fprintf(stderr, "%s -- CMD NOT CONSIDERED!!\n", buffer);
+                fprintf(stderr, "%s\n", buffer);
             }
         }
     }
@@ -224,8 +229,7 @@ void *ardop_control_worker_thread_tx(void *conn)
     rhizo_conn *connector = (rhizo_conn *) conn;
     char buffer[1024];
 
-    // some initialization
-
+    // initialize
     memset(buffer,0,sizeof(buffer));
     sprintf(buffer, "INITIALIZE\r");
     tcp_write(connector->control_socket, buffer, strlen(buffer));
@@ -255,18 +259,10 @@ void *ardop_control_worker_thread_tx(void *conn)
 
             fprintf(stderr, "Entrou na funcao de conexao\n");
 
-#if 0
-            // some entropy added
-            if (connector->mode == MODE_RX){
-                sleep (6);
-                if (connector->connected == true){
-                    continue;
-                }
-            }
-#endif
             memset(buffer,0,sizeof(buffer));
             sprintf(buffer,"ARQCALL %s 5\r", connector->remote_call_sign);
             send(connector->control_socket,buffer,strlen(buffer),0);
+
             connector->waiting_for_connection = true;
         }
         sleep(1);
