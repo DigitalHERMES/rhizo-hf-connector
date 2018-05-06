@@ -20,6 +20,16 @@
  * Buffer routines
  */
 
+/**
+ * @file buffer.h
+ * @author Rafael Diniz
+ * @date 12 Apr 2018
+ * @brief Buffer support functions
+ *
+ * Buffer auxiliary funtions.
+ *
+ */
+
 #ifndef HAVE_BUFFER_H__
 #define HAVE_BUFFER_H__
 

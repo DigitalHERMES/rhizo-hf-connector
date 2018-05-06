@@ -20,6 +20,16 @@
  * D-Star support routines
  */
 
+/**
+ * @file dstar.c
+ * @author Rafael Diniz
+ * @date 12 Apr 2018
+ * @brief D-Star specific support functions
+ *
+ * D-Star specific support functions
+ *
+ */
+
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>

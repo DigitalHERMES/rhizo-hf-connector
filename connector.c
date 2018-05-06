@@ -19,6 +19,16 @@
  *
  */
 
+/**
+ * @file connector.c
+ * @author Rafael Diniz
+ * @date 12 Apr 2018
+ * @brief Rhizo HF Connector main file
+ *
+ * Rhizo HF Connector main C file.
+ *
+ */
+
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
@@ -92,7 +102,7 @@ int main (int argc, char *argv[])
     // Catch Ctrl+C
     signal (SIGINT,finish);
 
-    fprintf(stderr, "Rhizo-connector by Rafael Diniz -  rafael (AT) rhizomatica (DOT) org\n");
+    fprintf(stderr, "Rhizo HF Connector v0.1 by Rafael Diniz -  rafael (AT) rhizomatica (DOT) org\n");
     fprintf(stderr, "License: GPLv3+\n\n");
 
     if (argc < 7)

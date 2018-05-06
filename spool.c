@@ -20,6 +20,16 @@
  * Spool directory routines
  */
 
+/**
+ * @file spool.c
+ * @author Rafael Diniz
+ * @date 12 Apr 2018
+ * @brief Spool directory routines
+ *
+ * Spool directory routines
+ *
+ */
+
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>

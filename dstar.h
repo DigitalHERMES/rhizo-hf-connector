@@ -20,6 +20,16 @@
  * D-Star support routines
  */
 
+/**
+ * @file dstar.h
+ * @author Rafael Diniz
+ * @date 12 Apr 2018
+ * @brief D-Star specific support functions
+ *
+ * D-Star specific support functions
+ *
+ */
+
 #ifndef HAVE_DSTAR_H__
 #define HAVE_DSTAR_H__
 

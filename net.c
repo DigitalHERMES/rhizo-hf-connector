@@ -21,7 +21,7 @@
  */
 
 /**
- * @file net.h
+ * @file net.c
  * @author Rafael Diniz
  * @date 12 Apr 2018
  * @brief File containing network related functions

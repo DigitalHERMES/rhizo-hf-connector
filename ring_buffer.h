@@ -1,3 +1,13 @@
+/**
+ * @file ring_buffer.h
+ * @author Rafael Diniz
+ * @date 12 Apr 2018
+ * @brief Optimized ring-buffer implementation
+ *
+ * Optimized ring-buffer implementation
+ *
+ */
+
 #ifndef HAVE_RING_BUFFER__
 #define HAVE_RING_BUFFER__
 

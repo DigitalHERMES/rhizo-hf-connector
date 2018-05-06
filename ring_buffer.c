@@ -1,3 +1,13 @@
+/**
+ * @file ring_buffer.c
+ * @author Rafael Diniz
+ * @date 12 Apr 2018
+ * @brief Optimized ring-buffer implementation
+ *
+ * Optimized ring-buffer implementation
+ *
+ */
+
 #include "ring_buffer.h"
 
 void ring_buffer_create (struct ring_buffer *buffer, unsigned long order)

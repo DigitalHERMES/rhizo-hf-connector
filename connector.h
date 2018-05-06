@@ -19,6 +19,16 @@
  *
  */
 
+/**
+ * @file connector.h
+ * @author Rafael Diniz
+ * @date 12 Apr 2018
+ * @brief Rhizo HF Connector main header file
+ *
+ * Rhizo HF Connector main header file.
+ *
+ */
+
 #ifndef HAVE_CONNECTOR_H__
 #define HAVE_CONNECTOR_H__
 

@@ -20,6 +20,16 @@
  * Buffer routines
  */
 
+/**
+ * @file buffer.c
+ * @author Rafael Diniz
+ * @date 12 Apr 2018
+ * @brief Buffer support functions
+ *
+ * Buffer auxiliary funtions.
+ *
+ */
+
 #include "buffer.h"
 
 inline void read_buffer(buffer *buf_in, uint8_t *buffer_out, int size) {

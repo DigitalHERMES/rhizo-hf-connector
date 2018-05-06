@@ -19,6 +19,16 @@
  *
  */
 
+/**
+ * @file spool.h
+ * @author Rafael Diniz
+ * @date 12 Apr 2018
+ * @brief Spool directory routines
+ *
+ * Spool directory routines
+ *
+ */
+
 #ifndef HAVE_SPOOL_H__
 #define HAVE_SPOOL_H__
 
