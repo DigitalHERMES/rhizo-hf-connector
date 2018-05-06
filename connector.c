@@ -88,6 +88,18 @@ void *modem_thread(void *conn)
     return NULL;
 }
 
+bool initialize_connector(rhizo_conn *connector){
+
+    initialize_buffer(&connector->in_buffer, 26); // 64MB
+    initialize_buffer(&connector->out_buffer, 26); // 64MB
+    pthread_mutex_init(&connector->msg_path_queue_mutex, NULL);
+
+    connector->connected = false;
+    connector->waiting_for_connection = false;
+    connector->msg_path_queue_size = 0;
+
+    return true;
+}
 
 int main (int argc, char *argv[])
 {
@@ -95,9 +107,7 @@ int main (int argc, char *argv[])
 
     tmp_conn = &connector;
 
-    // initialize our buffers
-    initialize_buffer(&connector.in_buffer, 26); // 64MB
-    initialize_buffer(&connector.out_buffer, 26); // 64MB
+    initialize_connector(&connector);
 
     // Catch Ctrl+C
     signal (SIGINT,finish);
@@ -162,9 +172,6 @@ int main (int argc, char *argv[])
             goto manual;
         }
     }
-
-    connector.connected = false;
-    connector.waiting_for_connection = false;
 
     pthread_t tid[3];
 

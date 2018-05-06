@@ -41,10 +41,8 @@
 #include <arpa/inet.h>
 
 #include "net.h"
+#include "spool.h"
 #include "vara.h"
-
-// transfering 1 byte at time
-#define TRX_BLK_SIZE 1
 
 void *vara_data_worker_thread_tx(void *conn)
 {
@@ -135,6 +133,19 @@ void *vara_control_worker_thread_rx(void *conn)
                 connector->connected = true;
                 connector->waiting_for_connection = false;
             } else
+            if (!memcmp(buffer, "BUFFER", strlen("BUFFER"))){
+                uint32_t buf_size;
+                sscanf( (char *) buffer, "BUFFER %u", &buf_size);
+                fprintf(stderr, "BUFFER: %u\n", buf_size);
+
+                // our delete messages mechanism
+                if (buf_size == 0 &&
+                    ring_buffer_count_bytes(&connector->in_buffer.buf) == 0 &&
+                    connector->connected == true){
+                    fprintf(stderr, "Shoud we call now to erase messages?\n");
+                    remove_all_msg_path_queue(connector);
+                }
+            } else
             if (!memcmp(buffer, "PTT", strlen("PTT"))){
                 // supressed output
                 // fprintf(stderr, "%s -- CMD NOT CONSIDERED!!\n", buffer);
@@ -169,11 +180,14 @@ void *vara_control_worker_thread_tx(void *conn)
             ring_buffer_count_bytes(&connector->in_buffer.buf) > 0 &&
             !connector->waiting_for_connection){
 
-            // TODO: try to add some entropy in order to avoid on air clashes
+            // \todo try to add some entropy in order to avoid on air clashes
             memset(buffer,0,sizeof(buffer));
             sprintf(buffer,"CONNECT %s %s\r", connector->call_sign,
                     connector->remote_call_sign);
             tcp_write(connector->control_socket, (uint8_t *)buffer, strlen(buffer));
+
+            fprintf(stderr, "CONNECTING... %s\n", buffer);
+
             connector->waiting_for_connection = true;
         }
 

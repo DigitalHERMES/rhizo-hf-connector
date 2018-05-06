@@ -42,6 +42,7 @@
 
 
 #include "ardop.h"
+#include "spool.h"
 #include "net.h"
 
 // TODO: implement a mechanism which verifies when messages are send (using BUFFER cmd)?
@@ -152,7 +153,7 @@ void *ardop_data_worker_thread_rx(void *conn)
             write_buffer(&connector->out_buffer, buffer + 3, buf_size);
         }
         else{
-            fprintf(stderr, "Ardop strang data rx: %s\n", buffer);
+            fprintf(stderr, "Ardop non-payload data rx: %s\n", buffer);
         }
 
     }
@@ -209,9 +210,15 @@ void *ardop_control_worker_thread_rx(void *conn)
                 uint32_t buf_size;
                 sscanf( (char *) buffer, "BUFFER %u", &buf_size);
                 fprintf(stderr, "BUFFER: %u\n", buf_size);
-                if (buf_size == 0){
-                    // fprintf(stderr, "Message sent\n");
+
+                // our delete messages mechanism
+                if (buf_size == 0 &&
+                    ring_buffer_count_bytes(&connector->in_buffer.buf) == 0 &&
+                    connector->connected == true){
+                    fprintf(stderr, "Shoud we call now to erase messages?\n");
+                    remove_all_msg_path_queue(connector);
                 }
+
             } else
             if (!memcmp(buffer, "INPUTPEAKS", strlen("INPUTPEAKS"))){
                 // suppressed output
@@ -251,17 +258,17 @@ void *ardop_control_worker_thread_tx(void *conn)
     // 1Hz function
     while(true){
 
-        // condition for connection: no connection AND something to transmitt
+        // condition for connection: no connection AND have something to transmit
 //        fprintf(stderr, "Connection loop conn: %d buf_cnt: %ld wait_conn %d \n", connector->connected, ring_buffer_count_bytes(&connector->in_buffer.buf), connector->waiting_for_connection);
         if (connector->connected == false &&
             ring_buffer_count_bytes(&connector->in_buffer.buf) > 0 &&
             !connector->waiting_for_connection){
 
-            fprintf(stderr, "Entrou na funcao de conexao\n");
-
             memset(buffer,0,sizeof(buffer));
             sprintf(buffer,"ARQCALL %s 5\r", connector->remote_call_sign);
-            send(connector->control_socket,buffer,strlen(buffer),0);
+            tcp_write(connector->control_socket, (uint8_t *)buffer, strlen(buffer));
+
+            fprintf(stderr, "CONNECTING... %s\n", buffer);
 
             connector->waiting_for_connection = true;
         }

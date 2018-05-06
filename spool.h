@@ -33,6 +33,7 @@
 #define HAVE_SPOOL_H__
 
 #include <stdint.h>
+#include "connector.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -42,5 +43,7 @@ extern "C" {
 
 void *spool_output_directory_thread(void *conn);
 void *spool_input_directory_thread(void *conn);
+bool queue_msg_path(char *msg_path, rhizo_conn *connector);
+bool remove_all_msg_path_queue(rhizo_conn *connector);
 
 #endif /* HAVE_SPOOL__ */

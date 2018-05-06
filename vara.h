@@ -42,6 +42,8 @@
 extern "C" {
 #endif
 
+#define MAX_MSG_QUEUE 5
+
 bool initialize_modem_vara(rhizo_conn *connector);
 
 #ifdef __cplusplus

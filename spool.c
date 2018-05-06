@@ -44,8 +44,37 @@
 #include <sys/inotify.h>
 
 #include "spool.h"
-#include "connector.h"
 
+bool queue_msg_path(char *msg_path, rhizo_conn *connector){
+
+    pthread_mutex_lock(&connector->msg_path_queue_mutex);
+
+    connector->msg_path_queue[connector->msg_path_queue_size] = (char *) malloc(strlen(msg_path)+1);
+    strcpy(connector->msg_path_queue[connector->msg_path_queue_size], msg_path);
+    connector->msg_path_queue_size++;
+
+    pthread_mutex_unlock(&connector->msg_path_queue_mutex);
+
+    return true;
+
+}
+
+bool remove_all_msg_path_queue(rhizo_conn *connector){
+    pthread_mutex_lock(&connector->msg_path_queue_mutex);
+
+    for(int i = 0; i < connector->msg_path_queue_size; i++){
+        if (unlink(connector->msg_path_queue[i]) != 0){
+            fprintf(stderr, "File %s could not be deleted!\n", connector->msg_path_queue[i]);
+        }
+        free(connector->msg_path_queue[i]);
+    }
+    connector->msg_path_queue_size = 0;
+    // add path to connector->msg_path_queue
+    pthread_mutex_unlock(&connector->msg_path_queue_mutex);
+
+    return true;
+
+}
 
 bool write_message_to_buffer(char *msg_path, rhizo_conn *connector){
     uint8_t buffer[BUFFER_SIZE];
@@ -73,7 +102,7 @@ bool write_message_to_buffer(char *msg_path, rhizo_conn *connector){
         total_read += read_count;
 
         // fprintf(stderr, "writing to buffer msg of size %u tx now: %lu\n", msg_size, read_count);
-       write_buffer(&connector->in_buffer, buffer, read_count);
+        write_buffer(&connector->in_buffer, buffer, read_count);
     }
 
     if (total_read != msg_size){
@@ -81,6 +110,8 @@ bool write_message_to_buffer(char *msg_path, rhizo_conn *connector){
     }
 
     fclose(f_in);
+
+    queue_msg_path(msg_path, connector);
 
     return true;
 }
@@ -209,7 +240,7 @@ void *spool_input_directory_thread(void *conn)
                 if ((event->mask & IN_CLOSE_WRITE) || (event->mask & IN_MOVED_TO)) {
                     strcpy(msg_path, connector->input_directory);
                     strcat(msg_path, event->name);
-                    printf("Writing message to buffer %s to buffer.\n", msg_path);
+                    printf("Writing message %s to buffer.\n", msg_path);
                     write_message_to_buffer(msg_path, connector);
                 }
 

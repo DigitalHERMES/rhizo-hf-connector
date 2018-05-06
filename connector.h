@@ -61,9 +61,10 @@ typedef struct{
     int data_socket;
     int control_socket;
     int mode;
+    pthread_mutex_t msg_path_queue_mutex;
+    char *msg_path_queue[4096];
+    size_t msg_path_queue_size;
 } rhizo_conn;
-
-
 
 
 #ifdef __cplusplus
