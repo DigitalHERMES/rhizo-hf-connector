@@ -12,15 +12,17 @@
 
 ## Usage
 
-| -r [ardop,dstar,vara] | Choose modem/radio type.
-| -i input_spool_directory | Input spool directory (Messages to send).
-| -o output_spool_directory | Output spool directory (Received messages).
-| -c callsign | Station Callsign (Eg: PU2HFF).
-| -d remote_callsign  |                  Remote Station Callsign.
-| -a tnc_ip_address    |                 IP address of the TNC,
-| -p tcp_base_port      |                TCP base port of the TNC. For VARA and ARDOP ports tcp_base_port and tcp_base_port+1 are used,
-| -t timeout                |            Time to wait before disconnect when idling.
-| -h                            |        Prints this help.
+| Option | Description |
+| ---------------------------------- | --- |
+| -r [ardop,dstar,vara] | Choose modem/radio type |
+| -i input_spool_directory | Input spool directory (Messages to send) |
+| -o output_spool_directory | Output spool directory (Received messages) |
+| -c callsign | Station Callsign (Eg: PU2HFF) |
+| -d remote_callsign  | Remote Station Callsign |
+| -a tnc_ip_address    | IP address of the TNC |
+| -p tcp_base_port      | TCP base port of the TNC. For VARA and ARDOP ports tcp_base_port and tcp_base_port+1 are used |
+| -t timeout       |            Time to wait before disconnect when idling |
+| -h |   Prints this help |
 
 ### Vara
 
