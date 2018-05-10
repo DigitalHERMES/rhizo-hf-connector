@@ -1,4 +1,4 @@
-/* Rhizo-connector: A connector to different HF modems
+/* Rhizo-HF-connector: A connector to different HF modems
  * Copyright (C) 2018 Rhizomatica
  * Author: Rafael Diniz <rafael@riseup.net>
  *
@@ -17,21 +17,21 @@
  * the Free Software Foundation, Inc., 51 Franklin Street,
  * Boston, MA 02110-1301, USA.
  *
- * Ardop support routines
+ * Common functions used by any type of modem
  */
 
 /**
- * @file ardop.h
+ * @file common.h
  * @author Rafael Diniz
- * @date 12 Apr 2018
- * @brief Ardop modem support functions
+ * @date 09 May 2018
+ * @brief Common functions used by any type of modem
  *
- * All the specific code for supporting Ardop.
+ * Common functions used by any type of modem.
  *
  */
 
-#ifndef HAVE_ARDOP_H__
-#define HAVE_ARDOP_H__
+#ifndef HAVE_COMMON__
+#define HAVE_COMMON__
 
 #include <stdint.h>
 #include <pthread.h>
@@ -42,16 +42,10 @@
 extern "C" {
 #endif
 
-// John Wiseman says 4096 is the maximum...
-#define MAX_ARDOP_PACKET 2048
-
-// 2 bytes max - standard is not clear which is the max size...
-#define MAX_ARDOP_PACKET_SAFE 65535
-
-bool initialize_modem_ardop(rhizo_conn *connector);
+void *connection_timeout_thread(void *conn);
 
 #ifdef __cplusplus
 };
 #endif
 
-#endif /* HAVE_ARDOP_H__ */
+#endif /* HAVE_COMMON */

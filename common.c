@@ -1,4 +1,4 @@
-/* Rhizo-connector: A connector to different HF modems
+/* Rhizo-HF-connector: A connector to different HF modems
  * Copyright (C) 2018 Rhizomatica
  * Author: Rafael Diniz <rafael@riseup.net>
  *
@@ -17,41 +17,45 @@
  * the Free Software Foundation, Inc., 51 Franklin Street,
  * Boston, MA 02110-1301, USA.
  *
- * Ardop support routines
+ * Functions used by any type of modem
  */
 
 /**
- * @file ardop.h
+ * @file common.c
  * @author Rafael Diniz
- * @date 12 Apr 2018
- * @brief Ardop modem support functions
+ * @date 09 May 2018
+ * @brief Common functions used by any type of modem
  *
- * All the specific code for supporting Ardop.
+ * Common functions used by any type of modem.
  *
  */
 
-#ifndef HAVE_ARDOP_H__
-#define HAVE_ARDOP_H__
-
 #include <stdint.h>
-#include <pthread.h>
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sched.h>
 
-#include "connector.h"
+#include "common.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+void *connection_timeout_thread(void *conn){
+    rhizo_conn *connector = (rhizo_conn *) conn;
 
-// John Wiseman says 4096 is the maximum...
-#define MAX_ARDOP_PACKET 2048
+    connector->timeout_counter = 0;
 
-// 2 bytes max - standard is not clear which is the max size...
-#define MAX_ARDOP_PACKET_SAFE 65535
+    while(true){
 
-bool initialize_modem_ardop(rhizo_conn *connector);
-
-#ifdef __cplusplus
-};
-#endif
-
-#endif /* HAVE_ARDOP_H__ */
+        if (connector->connected == true){
+            connector->timeout_counter++;
+        }
+        else{
+            connector->timeout_counter = 0;
+        }
+        sleep(1);
+    }
+}

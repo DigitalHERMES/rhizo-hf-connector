@@ -41,4 +41,4 @@ doc:
 	doxygen doxyfile
 
 clean:
-	rm -f rz-hf-connector *.o *~
+	rm -rf rz-hf-connector *.o *~ doc

@@ -97,6 +97,7 @@ bool initialize_connector(rhizo_conn *connector){
     connector->connected = false;
     connector->waiting_for_connection = false;
     connector->msg_path_queue_size = 0;
+    connector->safe_state = 0;
 
     return true;
 }
@@ -128,13 +129,13 @@ int main (int argc, char *argv[])
         fprintf(stderr, " -d remote_callsign           Remote Station Callsign.\n");
         fprintf(stderr, " -a tnc_ip_address            IP address of the TNC,\n");
         fprintf(stderr, " -p tcp_base_port              TCP base port of the TNC. For VARA and ARDOP ports tcp_base_port and tcp_base_port+1 are used,\n");
-        fprintf(stderr, " -s initial_state                 Initial modem state: RX, TX.");
+        fprintf(stderr, " -t timeout                 Time to wait before disconnect when idling.\n");
         fprintf(stderr, " -h                          Prints this help.\n");
         exit(EXIT_FAILURE);
     }
 
     int opt;
-    while ((opt = getopt(argc, argv, "hr:i:o:c:d:p:a:s:")) != -1)
+    while ((opt = getopt(argc, argv, "hr:i:o:c:d:p:a:t:")) != -1)
     {
         switch (opt)
         {
@@ -147,11 +148,8 @@ int main (int argc, char *argv[])
         case 'd':
             strcpy(connector.remote_call_sign, optarg);
             break;
-        case 's':
-            if (!strcmp("rx", optarg) || !strcmp("RX", optarg))
-                connector.mode = MODE_RX;
-            if (!strcmp("tx", optarg) || !strcmp("TX", optarg))
-                connector.mode = MODE_TX;
+        case 't':
+            connector.timeout = atoi(optarg);
             break;
         case 'p':
             connector.tcp_base_port = atoi(optarg);
@@ -172,6 +170,9 @@ int main (int argc, char *argv[])
             goto manual;
         }
     }
+
+    if (connector.timeout == 0)
+        connector.timeout = TIMEOUT_DEFAULT;
 
     pthread_t tid[3];
 

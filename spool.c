@@ -45,6 +45,14 @@
 
 #include "spool.h"
 
+
+/** @brief Queue a message path to the list of sent message paths
+ *         (waiting for an ack to be deleted)
+ *
+ *  @param msg_path ....
+ *  @param connector .....
+ *  @return bool .....
+ */
 bool queue_msg_path(char *msg_path, rhizo_conn *connector){
 
     pthread_mutex_lock(&connector->msg_path_queue_mutex);

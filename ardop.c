@@ -40,12 +40,10 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-
+#include "common.h"
 #include "ardop.h"
 #include "spool.h"
 #include "net.h"
-
-// TODO: implement a mechanism which verifies when messages are send (using BUFFER cmd)?
 
 void *ardop_data_worker_thread_tx(void *conn)
 {
@@ -56,10 +54,15 @@ void *ardop_data_worker_thread_tx(void *conn)
     uint32_t packet_size;
 
     while(true){
+        connector->safe_state++;
         // check if we are connected, otherwise, wait
         while (connector->connected == false || ring_buffer_count_bytes(&connector->in_buffer.buf) == 0){
             sleep(1);
         }
+        connector->safe_state--;
+
+        connector->timeout_counter = 0;
+
         // read header
         read_buffer(&connector->in_buffer, (uint8_t *) &buf_size, sizeof(buf_size)); // TODO: if the two parties in a connection have different endianess, we are in trouble
 
@@ -76,7 +79,7 @@ void *ardop_data_worker_thread_tx(void *conn)
         uint32_t counter = 0;
         uint32_t tx_size = packet_size;
         while (tx_size != 0){
-        // max size here is circa 8182 counting the 4byte header
+
            if (tx_size > MAX_ARDOP_PACKET){
                ardop_size[0] = (uint8_t) (MAX_ARDOP_PACKET >> 8);
                ardop_size[1] = (uint8_t) (MAX_ARDOP_PACKET & 255);
@@ -116,7 +119,7 @@ void *ardop_data_worker_thread_tx(void *conn)
                    tx_size -= tx_size;
                }
            }
-           fprintf(stderr, "ardop_data_worker_thread_tx: tcp_write %u\n", counter);
+
         }
 
         free(buffer);
@@ -132,11 +135,18 @@ void *ardop_data_worker_thread_rx(void *conn)
     uint8_t ardop_size[2];
 
     while(true){
+        connector->safe_state++;
+        // ardopc does not like select?
+//        while (connector->connected == false || select(connector->data_socket+1, &read_set, NULL, NULL, &timeout) == 0){
         while (connector->connected == false){
             sleep(1);
         }
 
         tcp_read(connector->data_socket, ardop_size, 2);
+
+        connector->safe_state--;
+        connector->timeout_counter = 0;
+
 
         // ARDOP TNC data format: length 2 bytes | payload
         buf_size = 0;
@@ -153,8 +163,11 @@ void *ardop_data_worker_thread_rx(void *conn)
             write_buffer(&connector->out_buffer, buffer + 3, buf_size);
         }
         else{
+            buffer[buf_size] = 0;
             fprintf(stderr, "Ardop non-payload data rx: %s\n", buffer);
         }
+
+        connector->timeout_counter = 0;
 
     }
 
@@ -211,6 +224,9 @@ void *ardop_control_worker_thread_rx(void *conn)
                 sscanf( (char *) buffer, "BUFFER %u", &buf_size);
                 fprintf(stderr, "BUFFER: %u\n", buf_size);
 
+                if (buf_size != 0)
+                    connector->timeout_counter = 0;
+
                 // our delete messages mechanism
                 if (buf_size == 0 &&
                     ring_buffer_count_bytes(&connector->in_buffer.buf) == 0 &&
@@ -239,27 +255,26 @@ void *ardop_control_worker_thread_tx(void *conn)
     // initialize
     memset(buffer,0,sizeof(buffer));
     sprintf(buffer, "INITIALIZE\r");
-    tcp_write(connector->control_socket, buffer, strlen(buffer));
+    tcp_write(connector->control_socket, (uint8_t *) buffer, strlen(buffer));
 
     // We set a call sign
     memset(buffer,0,sizeof(buffer));
     sprintf(buffer, "MYCALL %s\r", connector->call_sign);
-    tcp_write(connector->control_socket, buffer, strlen(buffer));
+    tcp_write(connector->control_socket, (uint8_t *) buffer, strlen(buffer));
 
-    // for initial development, set arq timeout to 4min
+    // we take care of timeout, here we just set the wanted timeout + 5
     memset(buffer,0,sizeof(buffer));
-    sprintf(buffer, "ARQTIMEOUT 240\r");
-    tcp_write(connector->control_socket, buffer, strlen(buffer));
+    sprintf(buffer, "ARQTIMEOUT %d\r", connector->timeout + 5);
+    tcp_write(connector->control_socket, (uint8_t *) buffer, strlen(buffer));
 
     memset(buffer,0,sizeof(buffer));
     strcpy(buffer,"LISTEN True\r");
-    tcp_write(connector->control_socket, buffer, strlen(buffer));
+    tcp_write(connector->control_socket, (uint8_t *) buffer, strlen(buffer));
 
     // 1Hz function
     while(true){
 
-        // condition for connection: no connection AND have something to transmit
-//        fprintf(stderr, "Connection loop conn: %d buf_cnt: %ld wait_conn %d \n", connector->connected, ring_buffer_count_bytes(&connector->in_buffer.buf), connector->waiting_for_connection);
+        // Logic to start a connection
         if (connector->connected == false &&
             ring_buffer_count_bytes(&connector->in_buffer.buf) > 0 &&
             !connector->waiting_for_connection){
@@ -272,6 +287,25 @@ void *ardop_control_worker_thread_tx(void *conn)
 
             connector->waiting_for_connection = true;
         }
+
+        // Logic to disconnect on timeout
+        if (connector->timeout_counter >= connector->timeout &&
+            connector->connected == true){
+
+            connector->connected = false;
+
+            while (connector->safe_state != 2){ // this means we have both data threads in the safe zone
+                // spin wait
+                sched_yield();
+            }
+            fprintf(stderr, "DISCONNECTING BY TIMEOUT...\n");
+
+            memset(buffer,0,sizeof(buffer));
+            sprintf(buffer,"DISCONNECT\r");
+            tcp_write(connector->control_socket, (uint8_t *)buffer, strlen(buffer));
+
+        }
+
         sleep(1);
 
     }
@@ -291,10 +325,12 @@ bool initialize_modem_ardop(rhizo_conn *connector){
     pthread_t tid2;
     pthread_create(&tid2, NULL, ardop_control_worker_thread_tx, (void *) connector);
 
-
     // and run the two workers for the data channel
     pthread_t tid3;
     pthread_create(&tid3, NULL, ardop_data_worker_thread_tx, (void *) connector);
+
+    pthread_t tid4;
+    pthread_create(&tid4, NULL, connection_timeout_thread, (void *) connector);
 
     // just to block, we dont create a new thread here
     ardop_data_worker_thread_rx((void *) connector);

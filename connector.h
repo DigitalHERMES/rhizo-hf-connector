@@ -33,6 +33,7 @@
 #define HAVE_CONNECTOR_H__
 
 #include <stdint.h>
+#include <stdatomic.h>
 #include <pthread.h>
 #include "buffer.h"
 
@@ -40,8 +41,8 @@
 extern "C" {
 #endif
 
-#define MODE_TX 0
-#define MODE_RX 1
+// 60s
+#define TIMEOUT_DEFAULT 60
 
 typedef struct{
 // public
@@ -52,20 +53,24 @@ typedef struct{
     char modem_type[32];
     char input_directory[1024];
     char output_directory[1024];
-    bool connected;
+    int timeout;
+
+// state variables
+// C11 atomic is used here instead of a more pedantic code with mutexes and so on... 
+    atomic_bool connected;
+    atomic_int timeout_counter;
+    atomic_bool waiting_for_connection;
+    atomic_int safe_state; // this means green light for changing state
 
 // private
-    bool waiting_for_connection;
     buffer in_buffer;
     buffer out_buffer;
     int data_socket;
     int control_socket;
-    int mode;
     pthread_mutex_t msg_path_queue_mutex;
     char *msg_path_queue[4096];
     size_t msg_path_queue_size;
 } rhizo_conn;
-
 
 #ifdef __cplusplus
 };

@@ -39,7 +39,10 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <sched.h>
 
+
+#include "common.h"
 #include "net.h"
 #include "spool.h"
 #include "vara.h"
@@ -52,11 +55,16 @@ void *vara_data_worker_thread_tx(void *conn)
 
     while(true){
         // check if we are connected, otherwise, wait
+        connector->safe_state++;
         while (connector->connected == false || ring_buffer_count_bytes(&connector->in_buffer.buf) == 0){
             sleep(1);
         }
+        connector->safe_state--;
+
+        connector->timeout_counter = 0;
+
         // read header
-        read_buffer(&connector->in_buffer, (uint8_t *) &buf_size, sizeof(buf_size)); // TODO: if the two parties in a connection have different endianess, we are in trouble
+        read_buffer(&connector->in_buffer, (uint8_t *) &buf_size, sizeof(buf_size)); // \todo if the two parties in a connection have different endianess, we are in trouble
 
         buffer = (uint8_t *) malloc (buf_size);
         memset(buffer, 0, buf_size);
@@ -75,11 +83,23 @@ void *vara_data_worker_thread_rx(void *conn)
     rhizo_conn *connector = (rhizo_conn *) conn;
     uint8_t *buffer;
     uint32_t buf_size;
+    fd_set read_set;
+    struct timeval timeout;
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 0;
+
+    FD_ZERO(&read_set);
+    FD_SET(connector->data_socket, &read_set);
 
     while(true){
-        while (connector->connected == false){
+        connector->safe_state++;
+        while (connector->connected == false || select(connector->data_socket+1, &read_set, NULL, NULL, &timeout) == 0){
             sleep(1);
         }
+        connector->safe_state--;
+
+        connector->timeout_counter = 0;
+
         tcp_read(connector->data_socket, (uint8_t *) &buf_size, sizeof(buf_size));
 
         buffer = (uint8_t *) malloc (buf_size);
@@ -90,6 +110,8 @@ void *vara_data_worker_thread_rx(void *conn)
 
         write_buffer(&connector->out_buffer, (uint8_t *) &buf_size, sizeof(buf_size));
         write_buffer(&connector->out_buffer, buffer, buf_size);
+
+        connector->timeout_counter = 0;
 
         free(buffer);
     }
@@ -138,6 +160,9 @@ void *vara_control_worker_thread_rx(void *conn)
                 sscanf( (char *) buffer, "BUFFER %u", &buf_size);
                 fprintf(stderr, "BUFFER: %u\n", buf_size);
 
+                if (buf_size != 0)
+                    connector->timeout_counter = 0;
+
                 // our delete messages mechanism
                 if (buf_size == 0 &&
                     ring_buffer_count_bytes(&connector->in_buffer.buf) == 0 &&
@@ -175,7 +200,9 @@ void *vara_control_worker_thread_tx(void *conn)
     // 1Hz function
     while(true){
 
-        // condition for connection: no connection AND something to transmitt
+
+        // Logic to start a connection
+        // condition for connection: no connection AND something to transmitt AND we did not issue a CONNECT recently
         if (connector->connected == false &&
             ring_buffer_count_bytes(&connector->in_buffer.buf) > 0 &&
             !connector->waiting_for_connection){
@@ -189,6 +216,23 @@ void *vara_control_worker_thread_tx(void *conn)
             fprintf(stderr, "CONNECTING... %s\n", buffer);
 
             connector->waiting_for_connection = true;
+        }
+
+        // Logic to disconnect on timeout
+        if (connector->timeout_counter >= connector->timeout &&
+            connector->connected == true){
+
+            connector->connected = false;
+
+            while (connector->safe_state != 2){ // this means we have both data threads in the safe zone
+                sched_yield();
+            }
+            fprintf(stderr, "DISCONNECTING BY TIMEOUT...\n");
+
+            memset(buffer,0,sizeof(buffer));
+            sprintf(buffer,"DISCONNECT\r");
+            tcp_write(connector->control_socket, (uint8_t *)buffer, strlen(buffer));
+
         }
 
         sleep(1);
@@ -212,6 +256,9 @@ bool initialize_modem_vara(rhizo_conn *connector){
 
     pthread_t tid3;
     pthread_create(&tid3, NULL, vara_data_worker_thread_tx, (void *) connector);
+
+    pthread_t tid4;
+    pthread_create(&tid4, NULL, connection_timeout_thread, (void *) connector);
 
     // just to block, we dont create a new thread here
     vara_data_worker_thread_rx((void *) connector);
