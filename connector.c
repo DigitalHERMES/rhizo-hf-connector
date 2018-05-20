@@ -96,6 +96,7 @@ bool initialize_connector(rhizo_conn *connector){
 
     connector->connected = false;
     connector->waiting_for_connection = false;
+    connector->tcp_ret_ok = true;
     connector->msg_path_queue_size = 0;
     connector->safe_state = 0;
 
@@ -181,6 +182,13 @@ int main (int argc, char *argv[])
 
     // pthread_create(&tid[2], NULL, modem_thread, (void *) &connector);
     modem_thread((void *) &connector);
+
+    if (connector.tcp_ret_ok == false){
+        // reconnect and call modem_thread again?
+        // say something to the spool threads??
+        // we cant guarantee nothing about data passed to tnc... pthread_cancel? select?
+        // spool needs to re-read the input directory...
+    }
 
     return EXIT_SUCCESS;
 }

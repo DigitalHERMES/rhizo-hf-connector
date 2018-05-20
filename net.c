@@ -57,7 +57,8 @@ bool tcp_connect(char *ip, int port, int *sockt){
 
     memset(ardop_addr.sin_zero, 0, sizeof(ardop_addr.sin_zero));
 
-    connect(*sockt, (struct sockaddr *) &ardop_addr, sizeof(ardop_addr));
+    if (connect(*sockt, (struct sockaddr *) &ardop_addr, sizeof(ardop_addr)) != 0)
+        return false;
 
     return true;
 }

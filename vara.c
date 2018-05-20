@@ -41,7 +41,6 @@
 #include <arpa/inet.h>
 #include <sched.h>
 
-
 #include "common.h"
 #include "net.h"
 #include "spool.h"
@@ -53,10 +52,15 @@ void *vara_data_worker_thread_tx(void *conn)
     uint8_t *buffer;
     uint32_t buf_size;
 
-    while(true){
+    while(connector->tcp_ret_ok){
+
         // check if we are connected, otherwise, wait
         connector->safe_state++;
         while (connector->connected == false || ring_buffer_count_bytes(&connector->in_buffer.buf) == 0){
+            if (connector->tcp_ret_ok == false){
+                connector->safe_state--;
+                goto exit_local;
+            }
             sleep(1);
         }
         connector->safe_state--;
@@ -70,12 +74,14 @@ void *vara_data_worker_thread_tx(void *conn)
         memset(buffer, 0, buf_size);
         read_buffer(&connector->in_buffer, buffer, buf_size);
 
-        tcp_write(connector->data_socket, (uint8_t *) &buf_size, sizeof(buf_size) );
-        tcp_write(connector->data_socket, buffer, buf_size);
+        connector->tcp_ret_ok &= tcp_write(connector->data_socket, (uint8_t *) &buf_size, sizeof(buf_size) );
+        connector->tcp_ret_ok &= tcp_write(connector->data_socket, buffer, buf_size);
 
         free(buffer);
     }
 
+exit_local:
+    return EXIT_SUCCESS;
 }
 
 void *vara_data_worker_thread_rx(void *conn)
@@ -83,28 +89,26 @@ void *vara_data_worker_thread_rx(void *conn)
     rhizo_conn *connector = (rhizo_conn *) conn;
     uint8_t *buffer;
     uint32_t buf_size;
-    fd_set read_set;
-    struct timeval timeout;
-    timeout.tv_sec = 0;
-    timeout.tv_usec = 0;
 
-    FD_ZERO(&read_set);
-    FD_SET(connector->data_socket, &read_set);
+    while(connector->tcp_ret_ok){
 
-    while(true){
         connector->safe_state++;
-        while (connector->connected == false || select(connector->data_socket+1, &read_set, NULL, NULL, &timeout) == 0){
+        while (connector->connected == false) {
+            if (connector->tcp_ret_ok == false){
+                connector->safe_state--;
+                goto exit_local;
+            }
             sleep(1);
         }
+        buf_size = 0;
+        connector->tcp_ret_ok &= tcp_read(connector->data_socket, (uint8_t *) &buf_size, sizeof(buf_size));
         connector->safe_state--;
 
         connector->timeout_counter = 0;
 
-        tcp_read(connector->data_socket, (uint8_t *) &buf_size, sizeof(buf_size));
-
         buffer = (uint8_t *) malloc (buf_size);
         memset(buffer, 0, buf_size);
-        tcp_read(connector->data_socket, buffer, buf_size);
+        connector->tcp_ret_ok &= tcp_read(connector->data_socket, buffer, buf_size);
 
         fprintf(stderr,"Message of size: %u received.\n", buf_size);
 
@@ -116,6 +120,8 @@ void *vara_data_worker_thread_rx(void *conn)
         free(buffer);
     }
 
+exit_local:
+    return EXIT_SUCCESS;
 }
 
 void *vara_control_worker_thread_rx(void *conn)
@@ -126,11 +132,8 @@ void *vara_control_worker_thread_rx(void *conn)
     int counter = 0;
     bool new_cmd = false;
 
-    while(true){
-        if (!tcp_read(connector->control_socket, &rcv_byte, 1)){
-                fprintf(stderr, "control_worker_thread_rx: socket read error.\n");
-                // goto die; // ?
-        }
+    while(connector->tcp_ret_ok){
+        connector->tcp_ret_ok &= tcp_read(connector->control_socket, &rcv_byte, 1);
 
         if (rcv_byte == '\r'){
             buffer[counter] = 0;
@@ -167,8 +170,10 @@ void *vara_control_worker_thread_rx(void *conn)
                 if (buf_size == 0 &&
                     ring_buffer_count_bytes(&connector->in_buffer.buf) == 0 &&
                     connector->connected == true){
-                    fprintf(stderr, "Shoud we call now to erase messages?\n");
+
+                    fprintf(stderr, "Messages successfully sent. Erasing messages...\n");
                     remove_all_msg_path_queue(connector);
+
                 }
             } else
             if (!memcmp(buffer, "PTT", strlen("PTT"))){
@@ -191,14 +196,14 @@ void *vara_control_worker_thread_tx(void *conn)
     // We set a call sign
     memset(buffer,0,sizeof(buffer));
     sprintf(buffer, "MYCALL %s\r", connector->call_sign);
-    tcp_write(connector->control_socket, (uint8_t *) buffer, strlen(buffer));
+    connector->tcp_ret_ok &= tcp_write(connector->control_socket, (uint8_t *) buffer, strlen(buffer));
 
     memset(buffer,0,sizeof(buffer));
     strcpy(buffer,"LISTEN ON\r");
-    tcp_write(connector->control_socket, (uint8_t *) buffer, strlen(buffer));
+    connector->tcp_ret_ok &= tcp_write(connector->control_socket, (uint8_t *) buffer, strlen(buffer));
 
     // 1Hz function
-    while(true){
+    while(connector->tcp_ret_ok){
 
 
         // Logic to start a connection
@@ -211,7 +216,7 @@ void *vara_control_worker_thread_tx(void *conn)
             memset(buffer,0,sizeof(buffer));
             sprintf(buffer,"CONNECT %s %s\r", connector->call_sign,
                     connector->remote_call_sign);
-            tcp_write(connector->control_socket, (uint8_t *)buffer, strlen(buffer));
+            connector->tcp_ret_ok &= tcp_write(connector->control_socket, (uint8_t *)buffer, strlen(buffer));
 
             fprintf(stderr, "CONNECTING... %s\n", buffer);
 
@@ -231,7 +236,7 @@ void *vara_control_worker_thread_tx(void *conn)
 
             memset(buffer,0,sizeof(buffer));
             sprintf(buffer,"DISCONNECT\r");
-            tcp_write(connector->control_socket, (uint8_t *)buffer, strlen(buffer));
+            connector->tcp_ret_ok &= tcp_write(connector->control_socket, (uint8_t *)buffer, strlen(buffer));
 
         }
 
@@ -243,8 +248,13 @@ void *vara_control_worker_thread_tx(void *conn)
 }
 
 bool initialize_modem_vara(rhizo_conn *connector){
-    tcp_connect(connector->ip_address, connector->tcp_base_port, &connector->control_socket);
-    tcp_connect(connector->ip_address, connector->tcp_base_port+1, &connector->data_socket);
+    connector->tcp_ret_ok &= tcp_connect(connector->ip_address, connector->tcp_base_port, &connector->control_socket);
+    connector->tcp_ret_ok &= tcp_connect(connector->ip_address, connector->tcp_base_port+1, &connector->data_socket);
+
+    if (connector->tcp_ret_ok == false){
+        fprintf(stderr, "Connection to TNC failure.\n");
+        return false;
+    }
 
     // we start our control thread
     pthread_t tid1;
@@ -258,10 +268,16 @@ bool initialize_modem_vara(rhizo_conn *connector){
     pthread_create(&tid3, NULL, vara_data_worker_thread_tx, (void *) connector);
 
     pthread_t tid4;
-    pthread_create(&tid4, NULL, connection_timeout_thread, (void *) connector);
+    pthread_create(&tid4, NULL, vara_data_worker_thread_rx, (void *) connector);
 
-    // just to block, we dont create a new thread here
-    vara_data_worker_thread_rx((void *) connector);
+    pthread_t tid5;
+    pthread_create(&tid5, NULL, connection_timeout_thread, (void *) connector);
+
+    pthread_join(tid1, NULL);
+    pthread_join(tid2, NULL);
+    pthread_join(tid3, NULL);
+    pthread_join(tid4, NULL);
+    pthread_join(tid5, NULL);
 
     return true;
 }

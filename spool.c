@@ -99,7 +99,7 @@ bool write_message_to_buffer(char *msg_path, rhizo_conn *connector){
     stat(msg_path, &st);
     msg_size = (uint32_t) st.st_size;
 
-    fprintf(stderr, "Loaded message from spool driver %s %u.\n", msg_path, msg_size);
+    fprintf(stderr, "Loaded message %s of size: %u.\n", msg_path, msg_size);
 
     // our 4 byte header which contains the size of the message
     write_buffer(&connector->in_buffer, (uint8_t *) &msg_size, sizeof(msg_size));
@@ -130,7 +130,7 @@ bool read_message_from_buffer(char *msg_path, rhizo_conn *connector){
 
         read_buffer(&connector->out_buffer, (uint8_t *) &msg_size, sizeof(msg_size));
 
-        fprintf(stderr, "Incoming message going to spool driver %u\n", msg_size);
+        fprintf(stderr, "Incoming message of size: %u\n", msg_size);
 
         FILE *fp = fopen (msg_path, "w");
         if (fp == NULL){
@@ -248,7 +248,6 @@ void *spool_input_directory_thread(void *conn)
                 if ((event->mask & IN_CLOSE_WRITE) || (event->mask & IN_MOVED_TO)) {
                     strcpy(msg_path, connector->input_directory);
                     strcat(msg_path, event->name);
-                    printf("Writing message %s to buffer.\n", msg_path);
                     write_message_to_buffer(msg_path, connector);
                 }
 

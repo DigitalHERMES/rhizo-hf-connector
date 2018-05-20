@@ -53,10 +53,15 @@ void *ardop_data_worker_thread_tx(void *conn)
     uint8_t ardop_size[2];
     uint32_t packet_size;
 
-    while(true){
+    while(connector->tcp_ret_ok){
+
         connector->safe_state++;
         // check if we are connected, otherwise, wait
         while (connector->connected == false || ring_buffer_count_bytes(&connector->in_buffer.buf) == 0){
+            if (connector->tcp_ret_ok == false){
+                connector->safe_state--;
+                goto exit_local;
+            }
             sleep(1);
         }
         connector->safe_state--;
@@ -66,13 +71,13 @@ void *ardop_data_worker_thread_tx(void *conn)
         // read header
         read_buffer(&connector->in_buffer, (uint8_t *) &buf_size, sizeof(buf_size)); // TODO: if the two parties in a connection have different endianess, we are in trouble
 
-        fprintf(stderr, "ardop_data_worker_thread_tx: Tx msg size: %u\n", buf_size);
+        // fprintf(stderr, "ardop_data_worker_thread_tx: Tx msg size: %u\n", buf_size);
 
         buffer = (uint8_t *) malloc(buf_size);
         memset(buffer, 0, buf_size);
         read_buffer(&connector->in_buffer, buffer, buf_size);
 
-        fprintf(stderr, "ardop_data_worker_thread_tx: After read buffer\n");
+        // fprintf(stderr, "ardop_data_worker_thread_tx: After read buffer\n");
 
         packet_size = buf_size + 4; // added our 4 bytes header with length
 
@@ -92,7 +97,7 @@ void *ardop_data_worker_thread_tx(void *conn)
            // ardop header
            tcp_write(connector->data_socket, ardop_size, sizeof(ardop_size));
 
-           fprintf(stderr, "ardop_data_worker_thread_tx: After ardop header tcp_write\n");
+           // fprintf(stderr, "ardop_data_worker_thread_tx: After ardop header tcp_write\n");
 
            if (tx_size == packet_size) { // first pass, we send our size header
                tcp_write(connector->data_socket, (uint8_t *) &buf_size, sizeof(buf_size) );
@@ -125,6 +130,8 @@ void *ardop_data_worker_thread_tx(void *conn)
         free(buffer);
     }
 
+exit_local:
+    return EXIT_SUCCESS;
 }
 
 void *ardop_data_worker_thread_rx(void *conn)
@@ -134,19 +141,21 @@ void *ardop_data_worker_thread_rx(void *conn)
     uint32_t buf_size; // our header is 4 bytes long
     uint8_t ardop_size[2];
 
-    while(true){
+    while(connector->tcp_ret_ok){
+
         connector->safe_state++;
-        // ardopc does not like select?
-//        while (connector->connected == false || select(connector->data_socket+1, &read_set, NULL, NULL, &timeout) == 0){
         while (connector->connected == false){
+            if (connector->tcp_ret_ok == false){
+                connector->safe_state--;
+                goto exit_local;
+            }
             sleep(1);
         }
-
+        ardop_size[0] = 0; ardop_size[1] = 0;
         tcp_read(connector->data_socket, ardop_size, 2);
-
         connector->safe_state--;
-        connector->timeout_counter = 0;
 
+        connector->timeout_counter = 0;
 
         // ARDOP TNC data format: length 2 bytes | payload
         buf_size = 0;
@@ -156,7 +165,7 @@ void *ardop_data_worker_thread_rx(void *conn)
 
         tcp_read(connector->data_socket, buffer, buf_size);
 
-        fprintf(stderr,"Ardop message of size: %u received.\n", buf_size);
+        // fprintf(stderr,"Ardop message of size: %u received.\n", buf_size);
 
         if (buf_size > 3 && !memcmp("ARQ", buffer,  3)){
             buf_size -= 3;
@@ -171,6 +180,7 @@ void *ardop_data_worker_thread_rx(void *conn)
 
     }
 
+exit_local:
     return EXIT_SUCCESS;
 }
 
@@ -182,8 +192,8 @@ void *ardop_control_worker_thread_rx(void *conn)
     int counter = 0;
     bool new_cmd = false;
 
-    while(true){
-        tcp_read(connector->control_socket, &rcv_byte, 1);
+    while(connector->tcp_ret_ok){
+        connector->tcp_ret_ok &= tcp_read(connector->control_socket, &rcv_byte, 1);
 
         if (rcv_byte == '\r'){
             buffer[counter] = 0;
@@ -231,10 +241,11 @@ void *ardop_control_worker_thread_rx(void *conn)
                 if (buf_size == 0 &&
                     ring_buffer_count_bytes(&connector->in_buffer.buf) == 0 &&
                     connector->connected == true){
-                    fprintf(stderr, "Shoud we call now to erase messages?\n");
-                    remove_all_msg_path_queue(connector);
-                }
 
+                    fprintf(stderr, "Messages successfully sent. Erasing messages...\n");
+                    remove_all_msg_path_queue(connector);
+
+                }
             } else
             if (!memcmp(buffer, "INPUTPEAKS", strlen("INPUTPEAKS"))){
                 // suppressed output
@@ -272,7 +283,7 @@ void *ardop_control_worker_thread_tx(void *conn)
     tcp_write(connector->control_socket, (uint8_t *) buffer, strlen(buffer));
 
     // 1Hz function
-    while(true){
+    while(connector->tcp_ret_ok){
 
         // Logic to start a connection
         if (connector->connected == false &&
@@ -314,8 +325,13 @@ void *ardop_control_worker_thread_tx(void *conn)
 }
 
 bool initialize_modem_ardop(rhizo_conn *connector){
-    tcp_connect(connector->ip_address, connector->tcp_base_port, &connector->control_socket);
-    tcp_connect(connector->ip_address, connector->tcp_base_port+1, &connector->data_socket);
+    connector->tcp_ret_ok &= tcp_connect(connector->ip_address, connector->tcp_base_port, &connector->control_socket);
+    connector->tcp_ret_ok &= tcp_connect(connector->ip_address, connector->tcp_base_port+1, &connector->data_socket);
+
+    if (connector->tcp_ret_ok == false){
+        fprintf(stderr, "Connection to TNC failure.\n");
+        return false;
+    }
 
     // we start our control rx thread
     pthread_t tid1;
@@ -330,10 +346,16 @@ bool initialize_modem_ardop(rhizo_conn *connector){
     pthread_create(&tid3, NULL, ardop_data_worker_thread_tx, (void *) connector);
 
     pthread_t tid4;
-    pthread_create(&tid4, NULL, connection_timeout_thread, (void *) connector);
+    pthread_create(&tid4, NULL, ardop_data_worker_thread_rx, (void *) connector);
 
-    // just to block, we dont create a new thread here
-    ardop_data_worker_thread_rx((void *) connector);
+    pthread_t tid5;
+    pthread_create(&tid5, NULL, connection_timeout_thread, (void *) connector);
+
+    pthread_join(tid1, NULL);
+    pthread_join(tid2, NULL);
+    pthread_join(tid3, NULL);
+    pthread_join(tid4, NULL);
+    pthread_join(tid5, NULL);
 
     return true;
 }

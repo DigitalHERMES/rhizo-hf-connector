@@ -48,7 +48,7 @@ void *connection_timeout_thread(void *conn){
 
     connector->timeout_counter = 0;
 
-    while(true){
+    while(connector->tcp_ret_ok){
 
         if (connector->connected == true){
             connector->timeout_counter++;
@@ -58,4 +58,6 @@ void *connection_timeout_thread(void *conn){
         }
         sleep(1);
     }
+
+    return EXIT_SUCCESS;
 }
