@@ -282,6 +282,11 @@ void *ardop_control_worker_thread_tx(void *conn)
     strcpy(buffer,"LISTEN True\r");
     tcp_write(connector->control_socket, (uint8_t *) buffer, strlen(buffer));
 
+    memset(buffer,0,sizeof(buffer));
+    strcpy(buffer,"BUSYDET 10\r");
+    tcp_write(connector->control_socket, (uint8_t *) buffer, strlen(buffer));
+
+
     // 1Hz function
     while(connector->tcp_ret_ok){
 
