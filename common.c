@@ -51,7 +51,9 @@ void *connection_timeout_thread(void *conn){
     while(connector->tcp_ret_ok){
 
         if (connector->connected == true){
-            connector->timeout_counter++;
+	  if (connector->safe_state == 2){
+	    connector->timeout_counter++;
+	  }
         }
         else{
             connector->timeout_counter = 0;
