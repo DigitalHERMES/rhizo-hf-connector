@@ -42,6 +42,7 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <sys/inotify.h>
+#include <libgen.h>
 
 #include "spool.h"
 
@@ -49,9 +50,9 @@
 /** @brief Queue a message path to the list of sent message paths
  *         (waiting for an ack to be deleted)
  *
- *  @param msg_path ....
- *  @param connector .....
- *  @return bool .....
+ *  @param msg_path Message path.
+ *  @param connector Connector handle.
+ *  @return bool Returns true in case of success.
  */
 bool queue_msg_path(char *msg_path, rhizo_conn *connector){
 
@@ -86,8 +87,10 @@ bool remove_all_msg_path_queue(rhizo_conn *connector){
 
 bool write_message_to_buffer(char *msg_path, rhizo_conn *connector){
     uint8_t buffer[BUFFER_SIZE];
+    char *base_path;
     FILE *f_in;
     uint32_t msg_size;
+    uint32_t msg_path_size = 0;
 
     f_in = fopen(msg_path,"r");
     if (f_in == NULL){
@@ -99,10 +102,19 @@ bool write_message_to_buffer(char *msg_path, rhizo_conn *connector){
     stat(msg_path, &st);
     msg_size = (uint32_t) st.st_size;
 
-    fprintf(stderr, "Loaded message %s of size: %u.\n", msg_path, msg_size);
+    base_path = basename(msg_path);
+
+    fprintf(stderr, "Loaded message %s with payload size %u.\n", base_path, msg_size);
+
+    msg_path_size = strlen(base_path)+1;
+    msg_size += msg_path_size;
+    base_path[msg_path_size-1] = '\n'; // adding a \n to the 0 in the string (just to make the message clear over the air)
 
     // our 4 byte header which contains the size of the message
     write_buffer(&connector->in_buffer, (uint8_t *) &msg_size, sizeof(msg_size));
+
+    // the file path basename
+    write_buffer(&connector->in_buffer, (uint8_t *) base_path, msg_path_size);
 
     size_t read_count = 0;
     uint32_t total_read = 0;
@@ -113,82 +125,78 @@ bool write_message_to_buffer(char *msg_path, rhizo_conn *connector){
         write_buffer(&connector->in_buffer, buffer, read_count);
     }
 
-    if (total_read != msg_size){
-        fprintf(stderr, "Warning: possible truncated message. FIXME! total_read = %u msg_size = %u\n", total_read, msg_size);
+    if (total_read + msg_path_size != msg_size){
+        fprintf(stderr, "Warning: possible truncated message. FIXME! total_read = %u msg_size = %u\n", total_read + msg_path_size, msg_size);
     }
 
     fclose(f_in);
 
+    base_path[msg_path_size-1] = 0; // reverting to a null terminated string
     queue_msg_path(msg_path, connector);
 
     return true;
 }
 
-bool read_message_from_buffer(char *msg_path, rhizo_conn *connector){
-        uint32_t msg_size = 0;
-        uint8_t buffer[BUFFER_SIZE];
+bool read_message_from_buffer(rhizo_conn *connector){
+    char msg_path[1024];
+    int index = 0;
+    char ch;
+    uint32_t msg_size = 0;
+    uint8_t buffer[BUFFER_SIZE];
 
-        read_buffer(&connector->out_buffer, (uint8_t *) &msg_size, sizeof(msg_size));
+    read_buffer(&connector->out_buffer, (uint8_t *) &msg_size, sizeof(msg_size));
 
-        fprintf(stderr, "Incoming message of size: %u\n", msg_size);
+    strcpy(msg_path, connector->output_directory);
+    do {
+        read_buffer(&connector->out_buffer, (uint8_t *) &ch, 1);
+        msg_path[strlen(connector->output_directory)+index] = ch;
+        index++;
+    } while(ch != '\n'); // TODO read from buffer the filename....
 
-        FILE *fp = fopen (msg_path, "w");
-        if (fp == NULL){
-            fprintf(stderr, "read_message_from_buffer: Message %s could not be opened.\n", msg_path);
-            return false;
+    msg_path[strlen(connector->output_directory)+index-1] = 0;
+
+    msg_size -= index;
+
+    fprintf(stderr, "Incoming message %s with payload size %u.\n", basename(msg_path), msg_size);
+
+    FILE *fp = fopen (msg_path, "w");
+    if (fp == NULL){
+        fprintf(stderr, "read_message_from_buffer: Message %s could not be opened.\n", msg_path);
+        return false;
+    }
+
+    uint32_t counter = msg_size;
+    while (counter != 0){
+        if (counter > BUFFER_SIZE){
+            read_buffer(&connector->out_buffer, buffer, BUFFER_SIZE);
+            fwrite(buffer, 1, BUFFER_SIZE, fp);
+            counter -= BUFFER_SIZE;
         }
-
-        uint32_t counter = msg_size;
-        while (counter != 0){
-            if (counter > BUFFER_SIZE){
-                read_buffer(&connector->out_buffer, buffer, BUFFER_SIZE);
-                fwrite(buffer, 1, BUFFER_SIZE, fp);
-                counter -= BUFFER_SIZE;
-            }
-            else{
-                read_buffer(&connector->out_buffer, buffer, counter);
-                fwrite(buffer, 1, counter, fp);
-                counter -= counter;
-            }
+        else{
+            read_buffer(&connector->out_buffer, buffer, counter);
+            fwrite(buffer, 1, counter, fp);
+            counter -= counter;
         }
+    }
 
-        fclose(fp);
+    fclose(fp);
 
-        return true;
+    return true;
 }
 
 void *spool_output_directory_thread(void *conn)
 {
     rhizo_conn *connector = (rhizo_conn *) conn;
-    struct dirent *dp;
-    char msg_path[1024];
-    uint32_t msg_counter = 0;
 
     DIR *dirp = opendir(connector->output_directory);
     if (dirp == NULL){
         fprintf(stderr, "Directory \"%s\" could not be opened.\n", connector->output_directory);
         return NULL;
     }
-
-    uint32_t higher_previous_message = 0;
-    while ((dp = readdir(dirp)) != NULL){
-        if (dp->d_type == DT_REG){
-            uint32_t curr_msg;
-            sscanf(dp->d_name, "msg-%u.txt", &curr_msg);
-            if (curr_msg > higher_previous_message)
-                higher_previous_message = curr_msg;
-        }
-    }
-    (void)closedir(dirp);
-
-    msg_counter = higher_previous_message + 1;
+    closedir(dirp);
 
     while (true){
-        strcpy(msg_path, connector->output_directory);
-        sprintf(msg_path+strlen(msg_path), "msg-%010u.txt", msg_counter);
-        msg_counter++;
-
-        read_message_from_buffer(msg_path, connector);
+        read_message_from_buffer(connector);
     }
 
     return NULL;
@@ -212,7 +220,7 @@ void *spool_input_directory_thread(void *conn)
             write_message_to_buffer(msg_path, connector);
         }
     }
-    (void)closedir(dirp);
+    closedir(dirp);
 
 
     // now starts inotify marvelous...
