@@ -54,7 +54,10 @@ void *connection_timeout_thread(void *conn){
 	  if (connector->safe_state == 2){
 	    connector->timeout_counter++;
 	  }
-        }
+	  else{
+	    connector->timeout_counter = 0;
+	  }
+	}
         else{
             connector->timeout_counter = 0;
         }

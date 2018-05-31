@@ -275,7 +275,8 @@ void *ardop_control_worker_thread_tx(void *conn)
 
     // we take care of timeout, here we just set the wanted timeout + 5
     memset(buffer,0,sizeof(buffer));
-    sprintf(buffer, "ARQTIMEOUT %d\r", connector->timeout + 5);
+    //    sprintf(buffer, "ARQTIMEOUT %d\r", connector->timeout + 5);
+    sprintf(buffer, "ARQTIMEOUT %d\r", 240);
     tcp_write(connector->control_socket, (uint8_t *) buffer, strlen(buffer));
 
     memset(buffer,0,sizeof(buffer));
