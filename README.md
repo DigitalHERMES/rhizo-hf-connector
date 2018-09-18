@@ -36,6 +36,10 @@ Example of invocation command for Ardop2 with an ICOM IC-7100, base port: 8515:
 
     $ ardopc2 8515 -c /dev/ttyUSB0 ARDOP ARDOP -k FEFE88E01C0001FD -u FEFE88E01C0000FD
 
+With the following ALSA configuration (global-wide ALSA configuration in "/etc/asound.conf"): 
+
+    pcm.ARDOP {type rate slave {pcm "hw:1,0" rate 48000}}
+
 Associated rz-hf-connector command example:
 
     $ rz-hf-connector -r ardop -i /var/spool/outgoing_messages/ -o /var/spool/incoming_messages/ -c BB2UIT -d PP2UIT -a 127.0.0.1 -p 8515 -t 60
