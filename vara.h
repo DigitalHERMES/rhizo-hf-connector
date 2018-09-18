@@ -42,7 +42,8 @@
 extern "C" {
 #endif
 
-#define MAX_MSG_QUEUE 5
+// here we have the maximum number of messages when we stop sending and wait to get ack from other side (TODO)
+#define MAX_MSG_QUEUE_SIZE 5
 
 bool initialize_modem_vara(rhizo_conn *connector);
 

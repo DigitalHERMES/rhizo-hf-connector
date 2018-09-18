@@ -4,11 +4,11 @@
   HF modems.
 
   Currently, Rhizo-HF-connector sends messages which are placed inside an input
-  directory, and writes received messages to an output directory, using a HF
-  modem as channel.
+  directory, and writes received messages to an output directory, keeping
+  file names, using a HF modem as channel.
 
   Support for the following TNCs are implemented: VARA and Ardop (works
-  with both protocols version 1 and 2).
+  with ardop versions 1, 2 and ofdm).
 
 ## Usage
 
@@ -26,34 +26,23 @@
 
 ### Vara
 
-For VARA modem, on gateway side (set VARA to ports 8300 / 8301):
+Example for running rz-hf-connector with VARA modem, on base port 8300:
 
-    $ rz-hf-connector -r vara -i l1/ -o l2/ -c PP2PPP -d UU2UUU -a 127.0.0.1 -p 8300 -t 60
-
-On client side (ports to 8400/8401):
-
-    $ rz-hf-connector -r vara -i r1/ -o r2/ -c UU2UUU -d PP2PPP -a 127.0.0.1 -p 8400 -t 60
+    $ rz-hf-connector -r vara -i l1/ -o l2/ -c BB2ITU -d UU2ITU -a 127.0.0.1 -p 8300 -t 60
 
 ### Ardop
 
-For Ardop, run ardopc, for example, in one side (ports 8517/8518):
+Example of invocation command for Ardop2 with an ICOM IC-7100, base port: 8515:
 
-    $ ardopc 8517 hw:0,0 hw:0,0
+    $ ardopc2 8515 -c /dev/ttyUSB0 ARDOP ARDOP -k FEFE88E01C0001FD -u FEFE88E01C0000FD
 
-In the other site (ports 8515/8516):
+Associated rz-hf-connector command example:
 
-    $ ardopc 8515 hw:0,1 hw:0,1
-
-And rhizo-connector:
-
-    $ rz-hf-connector -r ardop -i l1/ -o l2/ -c PP2UIT -d BB2UIT -a 127.0.0.1 -p 8515 -t 60
-
-    $ rz-hf-connector -r ardop -i r1/ -o r2/ -c BB2UIT -d PP2UIT -a 127.0.0.1 -p 8517 -t 60
-
+    $ rz-hf-connector -r ardop -i /var/spool/outgoing_messages/ -o /var/spool/incoming_messages/ -c BB2UIT -d PP2UIT -a 127.0.0.1 -p 8515 -t 60
 
 ### D-Star
 
-TODO
+Not implemented yet.
 
 ## Author
 
