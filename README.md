@@ -3,9 +3,10 @@
   Rhizo-HF-connector is a file exchange solution compatible with different
   HF modems.
 
-  Currently, Rhizo-HF-connector sends messages which are placed inside an input
-  directory, and writes received messages to an output directory, keeping
-  file names, using a HF modem as channel.
+  Rhizo-HF-connector controls a TNC to transmit or receive files,
+  though a inotify-driven interface, in which files written to a specified directory
+  are automatically transmitted by the TNC, and files received from TNC are
+  written to a specified directory.
 
   Support for the following TNCs are implemented: VARA and Ardop (works
   with ardop versions 1, 2 and ofdm).
