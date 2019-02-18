@@ -216,6 +216,12 @@ void *spool_input_directory_thread(void *conn)
     while ((dp = readdir(dirp)) != NULL){
         if (dp->d_type == DT_REG){
             strcpy(msg_path, connector->input_directory);
+            char *last = &msg_path[strlen(msg_path)-1];
+            fprintf(stderr, "path ..  %c\n", last[0]);
+            if (last[0] != '/'){
+                last[1] = '/';
+                last[2] = 0;
+            }
             strcat(msg_path, dp->d_name);
             write_message_to_buffer(msg_path, connector);
         }
