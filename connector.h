@@ -42,7 +42,7 @@ extern "C" {
 #endif
 
 // 60s
-#define TIMEOUT_DEFAULT 60
+#define TIMEOUT_DEFAULT 30
 
 typedef struct{
 // public
@@ -53,6 +53,7 @@ typedef struct{
     char modem_type[32];
     char input_directory[1024];
     char output_directory[1024];
+    bool ofdm_mode;
     int timeout;
 
 // state variables

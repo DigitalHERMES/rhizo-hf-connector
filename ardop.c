@@ -165,11 +165,12 @@ void *ardop_data_worker_thread_rx(void *conn)
 
         tcp_read(connector->data_socket, buffer, buf_size);
 
-        // fprintf(stderr,"Ardop message of size: %u received.\n", buf_size);
+        fprintf(stderr,"Ardop message of size: %u received.\n", buf_size);
 
         if (buf_size > 3 && !memcmp("ARQ", buffer,  3)){
             buf_size -= 3;
             write_buffer(&connector->out_buffer, buffer + 3, buf_size);
+            fprintf(stderr,"Buffer write: %u received.\n", buf_size);
         }
         else{
             buffer[buf_size] = 0;
@@ -287,6 +288,12 @@ void *ardop_control_worker_thread_tx(void *conn)
     strcpy(buffer,"BUSYDET 10\r");
     tcp_write(connector->control_socket, (uint8_t *) buffer, strlen(buffer));
 
+    memset(buffer,0,sizeof(buffer));
+    if (connector->ofdm_mode == true)
+        strcpy(buffer,"ENABLEOFDM True\r");
+    else
+        strcpy(buffer,"ENABLEOFDM False\r");
+    tcp_write(connector->control_socket, (uint8_t *) buffer, strlen(buffer));
 
     // 1Hz function
     while(connector->tcp_ret_ok){
@@ -308,6 +315,8 @@ void *ardop_control_worker_thread_tx(void *conn)
         // Logic to disconnect on timeout
         if (connector->timeout_counter >= connector->timeout &&
             connector->connected == true){
+
+            // SET listen to FALSE here...
 
             connector->connected = false;
 

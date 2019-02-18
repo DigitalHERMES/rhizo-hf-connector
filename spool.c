@@ -147,13 +147,6 @@ bool read_message_from_buffer(rhizo_conn *connector){
     read_buffer(&connector->out_buffer, (uint8_t *) &msg_size, sizeof(msg_size));
 
     strcpy(msg_path, connector->output_directory);
-
-    char *last = &msg_path[strlen(msg_path)-1];
-    if (last[0] != '/'){
-        last[1] = '/';
-        last[2] = 0;
-    }
-
     do {
         read_buffer(&connector->out_buffer, (uint8_t *) &ch, 1);
         msg_path[strlen(connector->output_directory)+index] = ch;
@@ -223,13 +216,6 @@ void *spool_input_directory_thread(void *conn)
     while ((dp = readdir(dirp)) != NULL){
         if (dp->d_type == DT_REG){
             strcpy(msg_path, connector->input_directory);
-
-            char *last = &msg_path[strlen(msg_path)-1];
-            if (last[0] != '/'){
-                last[1] = '/';
-                last[2] = 0;
-            }
-
             strcat(msg_path, dp->d_name);
             write_message_to_buffer(msg_path, connector);
         }

@@ -100,6 +100,9 @@ bool initialize_connector(rhizo_conn *connector){
     connector->msg_path_queue_size = 0;
     connector->safe_state = 0;
 
+    connector->timeout = TIMEOUT_DEFAULT;
+    connector->ofdm_mode = true;
+
     return true;
 }
 
@@ -131,12 +134,14 @@ int main (int argc, char *argv[])
         fprintf(stderr, " -a tnc_ip_address            IP address of the TNC,\n");
         fprintf(stderr, " -p tcp_base_port              TCP base port of the TNC. For VARA and ARDOP ports tcp_base_port and tcp_base_port+1 are used,\n");
         fprintf(stderr, " -t timeout                 Time to wait before disconnect when idling.\n");
+        fprintf(stderr, " -f features                Enable/Disable features. Supported features: ofdm, noofdm.\n");
         fprintf(stderr, " -h                          Prints this help.\n");
         exit(EXIT_FAILURE);
     }
 
+    char *last;
     int opt;
-    while ((opt = getopt(argc, argv, "hr:i:o:c:d:p:a:t:")) != -1)
+    while ((opt = getopt(argc, argv, "hr:i:o:c:d:p:a:t:f:")) != -1)
     {
         switch (opt)
         {
@@ -163,17 +168,30 @@ int main (int argc, char *argv[])
             break;
         case 'i':
             strcpy(connector.input_directory, optarg);
+            last = &connector.input_directory[strlen(connector.input_directory)-1];
+            if (last[0] != '/'){
+                last[1] = '/';
+                last[2] = 0;
+            }
             break;
         case 'o':
             strcpy(connector.output_directory, optarg);
+            last = &connector.output_directory[strlen(connector.output_directory)-1];
+            if (last[0] != '/'){
+                last[1] = '/';
+                last[2] = 0;
+            }
+            break;
+        case 'f':
+            if(strstr(optarg, "noofdm"))
+                connector.ofdm_mode = false;
+            else
+                connector.ofdm_mode = true;
             break;
         default:
             goto manual;
         }
     }
-
-    if (connector.timeout == 0)
-        connector.timeout = TIMEOUT_DEFAULT;
 
     pthread_t tid[3];
 

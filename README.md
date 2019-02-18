@@ -9,7 +9,7 @@
   written to a specified directory.
 
   Support for the following TNCs are implemented: VARA and Ardop (works
-  with ardop versions 1, 2 and ofdm).
+  with normal ardop or experimental the ofdm mode).
 
 ## Usage
 
@@ -23,6 +23,7 @@
 | -a tnc_ip_address | IP address of the TNC |
 | -p tcp_base_port | TCP base port of the TNC. For VARA and ARDOP ports tcp_base_port and tcp_base_port+1 are used |
 | -t timeout | Time to wait before disconnect when idling |
+| -f features | Enable/Disable features. Supported features: ofdm, noofdm.|
 | -h | Prints this help |
 
 ### Vara
