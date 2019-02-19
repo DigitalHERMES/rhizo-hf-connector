@@ -102,14 +102,13 @@ bool initialize_connector(rhizo_conn *connector){
 
     connector->timeout = TIMEOUT_DEFAULT;
     connector->ofdm_mode = true;
-
+    connector->buffer_size = 0;
     return true;
 }
 
 int main (int argc, char *argv[])
 {
     rhizo_conn connector;
-
     tmp_conn = &connector;
 
     initialize_connector(&connector);
@@ -117,7 +116,7 @@ int main (int argc, char *argv[])
     // Catch Ctrl+C
     signal (SIGINT,finish);
 
-    fprintf(stderr, "Rhizo HF Connector v0.1 by Rafael Diniz -  rafael (AT) rhizomatica (DOT) org\n");
+    fprintf(stderr, "Rhizomatica's HF Connector version 0.2 by Rafael Diniz -  rafael (AT) rhizomatica (DOT) org\n");
     fprintf(stderr, "License: GPLv3+\n\n");
 
     if (argc < 7)
@@ -126,7 +125,7 @@ int main (int argc, char *argv[])
         fprintf(stderr, "Usage modes: \n%s -r radio_modem_type -i input_spool_directory -o output_spool_directory -c callsign -d remote_callsign -s RX -a tnc_ip_address -p tcp_base_port\n", argv[0]);
         fprintf(stderr, "%s -h\n", argv[0]);
         fprintf(stderr, "\nOptions:\n");
-        fprintf(stderr, " -r [ardop,dstar,vara]       Choose modem/radio type.\n");
+        fprintf(stderr, " -r [ardop,dstar,vara]           Choose modem/radio type.\n");
         fprintf(stderr, " -i input_spool_directory    Input spool directory (Messages to send).\n");
         fprintf(stderr, " -o output_spool_directory    Output spool directory (Received messages).\n");
         fprintf(stderr, " -c callsign                        Station Callsign (Eg: PU2HFF).\n");

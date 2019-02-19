@@ -43,7 +43,11 @@ extern "C" {
 #endif
 
 // John Wiseman says 4096 is the maximum...
-#define MAX_ARDOP_PACKET 2048
+#define MAX_ARDOP_PACKET 1024
+
+// Maximum internal safe ardop buffer size
+#define MAX_ARDOP_BUFFER 6000
+
 
 // 2 bytes max - standard is not clear which is the max size...
 #define MAX_ARDOP_PACKET_SAFE 65535

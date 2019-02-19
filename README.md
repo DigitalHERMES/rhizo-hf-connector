@@ -8,7 +8,7 @@
   are automatically transmitted by the TNC, and files received from TNC are
   written to a specified directory.
 
-  Support for the following TNCs are implemented: VARA and Ardop (works
+  Support for the following TNCs are implemented: Ardop (works
   with normal ardop or experimental the ofdm mode).
 
 ## Usage

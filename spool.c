@@ -167,6 +167,12 @@ bool read_message_from_buffer(rhizo_conn *connector){
 
     uint32_t counter = msg_size;
     while (counter != 0){
+#if 1
+        read_buffer(&connector->out_buffer, buffer, 1);
+        fwrite(buffer, 1, 1, fp);
+        counter--;
+//        fprintf(stderr, "%c", buffer[0]);
+#else
         if (counter > BUFFER_SIZE){
             read_buffer(&connector->out_buffer, buffer, BUFFER_SIZE);
             fwrite(buffer, 1, BUFFER_SIZE, fp);
@@ -177,6 +183,8 @@ bool read_message_from_buffer(rhizo_conn *connector){
             fwrite(buffer, 1, counter, fp);
             counter -= counter;
         }
+#endif
+//        fprintf(stderr, "rx counter: %u\n", counter);
     }
 
     fclose(fp);

@@ -21,7 +21,7 @@
 
 PREFIX=/usr
 CC=gcc
-CFLAGS=-g -Wall -std=gnu11 -pthread
+CFLAGS=-g -Wall -std=gnu17 -pthread -D_FORTIFY_SOURCE=2 -fstack-protector-strong	
 
 all: rz-hf-connector
 

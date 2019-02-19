@@ -52,13 +52,14 @@ void *ardop_data_worker_thread_tx(void *conn)
     uint32_t buf_size; // our header is 4 bytes long
     uint8_t ardop_size[2];
     uint32_t packet_size;
+    bool running = true;
 
-    while(connector->tcp_ret_ok){
+    while(running){
 
         connector->safe_state++;
         // check if we are connected, otherwise, wait
         while (connector->connected == false || ring_buffer_count_bytes(&connector->in_buffer.buf) == 0){
-            if (connector->tcp_ret_ok == false){
+            if (running == false){
                 connector->safe_state--;
                 goto exit_local;
             }
@@ -66,7 +67,7 @@ void *ardop_data_worker_thread_tx(void *conn)
         }
         connector->safe_state--;
 
-        connector->timeout_counter = 0;
+//        connector->timeout_counter = 0;
 
         // read header
         read_buffer(&connector->in_buffer, (uint8_t *) &buf_size, sizeof(buf_size)); // TODO: if the two parties in a connection have different endianess, we are in trouble
@@ -85,35 +86,40 @@ void *ardop_data_worker_thread_tx(void *conn)
         uint32_t tx_size = packet_size;
         while (tx_size != 0){
 
-           if (tx_size > MAX_ARDOP_PACKET){
-               ardop_size[0] = (uint8_t) (MAX_ARDOP_PACKET >> 8);
-               ardop_size[1] = (uint8_t) (MAX_ARDOP_PACKET & 255);
-           }
-           else{
-               ardop_size[0] = (uint8_t) (tx_size >> 8);
-               ardop_size[1] = (uint8_t) (tx_size & 255);
-           }
+            if(connector->buffer_size > MAX_ARDOP_BUFFER){
+                while (connector->buffer_size >  2* MAX_ARDOP_BUFFER / 3)
+                    sleep(1);
+            }
 
-           // ardop header
-           tcp_write(connector->data_socket, ardop_size, sizeof(ardop_size));
+            if (tx_size > MAX_ARDOP_PACKET){
+                ardop_size[0] = (uint8_t) (MAX_ARDOP_PACKET >> 8);
+                ardop_size[1] = (uint8_t) (MAX_ARDOP_PACKET & 255);
+            }
+            else{
+                ardop_size[0] = (uint8_t) (tx_size >> 8);
+                ardop_size[1] = (uint8_t) (tx_size & 255);
+            }
+
+            // ardop header
+            tcp_write(connector->data_socket, ardop_size, sizeof(ardop_size));
 
            // fprintf(stderr, "ardop_data_worker_thread_tx: After ardop header tcp_write\n");
 
-           if (tx_size == packet_size) { // first pass, we send our size header
-               tcp_write(connector->data_socket, (uint8_t *) &buf_size, sizeof(buf_size) );
-               if (tx_size > MAX_ARDOP_PACKET){
-                   tcp_write(connector->data_socket, buffer , MAX_ARDOP_PACKET - 4);
-                   counter += MAX_ARDOP_PACKET - 4;
-                   tx_size -= MAX_ARDOP_PACKET;
-               }
-               else{
-                   tcp_write(connector->data_socket, buffer, tx_size - 4);
-                   counter += tx_size - 4;
-                   tx_size -= tx_size;
-               }
-           }
-           else{ // not first pass
-               if (tx_size > MAX_ARDOP_PACKET){
+            if (tx_size == packet_size) { // first pass, we send our size header
+                tcp_write(connector->data_socket, (uint8_t *) &buf_size, sizeof(buf_size) );
+                if (tx_size > MAX_ARDOP_PACKET){
+                    tcp_write(connector->data_socket, buffer , MAX_ARDOP_PACKET - 4);
+                    counter += MAX_ARDOP_PACKET - 4;
+                    tx_size -= MAX_ARDOP_PACKET;
+                }
+                else{
+                    tcp_write(connector->data_socket, buffer, tx_size - 4);
+                    counter += tx_size - 4;
+                    tx_size -= tx_size;
+                }
+            }
+            else{ // not first pass
+                if (tx_size > MAX_ARDOP_PACKET){
                    tcp_write(connector->data_socket, &buffer[counter] , MAX_ARDOP_PACKET);
                    counter += MAX_ARDOP_PACKET;
                    tx_size -= MAX_ARDOP_PACKET;
@@ -124,13 +130,17 @@ void *ardop_data_worker_thread_tx(void *conn)
                    tx_size -= tx_size;
                }
            }
-
+            fprintf(stderr, "Tx bytes remaining: %u\n", tx_size);
+            // buffer management hack
+            sleep(2);
         }
 
         free(buffer);
     }
 
 exit_local:
+
+    fprintf(stderr, "Exiting ardop_data_worker_thread_tx... Do we really want this?\n");
     return EXIT_SUCCESS;
 }
 
@@ -151,11 +161,13 @@ void *ardop_data_worker_thread_rx(void *conn)
             }
             sleep(1);
         }
+
+        // fprintf(stderr,"Before tcp_read.\n");
         ardop_size[0] = 0; ardop_size[1] = 0;
         tcp_read(connector->data_socket, ardop_size, 2);
         connector->safe_state--;
 
-        connector->timeout_counter = 0;
+//        connector->timeout_counter = 0;
 
         // ARDOP TNC data format: length 2 bytes | payload
         buf_size = 0;
@@ -163,21 +175,22 @@ void *ardop_data_worker_thread_rx(void *conn)
         buf_size <<= 8;
         buf_size |= ardop_size[1];
 
-        tcp_read(connector->data_socket, buffer, buf_size);
+        fprintf(stderr,"Ardop Rcv Pkt: %u bytes.\n", buf_size);
 
-        fprintf(stderr,"Ardop message of size: %u received.\n", buf_size);
+        tcp_read(connector->data_socket, buffer, buf_size);
 
         if (buf_size > 3 && !memcmp("ARQ", buffer,  3)){
             buf_size -= 3;
             write_buffer(&connector->out_buffer, buffer + 3, buf_size);
-            fprintf(stderr,"Buffer write: %u received.\n", buf_size);
+            // fprintf(stderr,"Buffer write: %u received.\n", buf_size);
+            // fwrite(buffer+3, buf_size, 1, stdout);
         }
         else{
             buffer[buf_size] = 0;
             fprintf(stderr, "Ardop non-payload data rx: %s\n", buffer);
         }
 
-        connector->timeout_counter = 0;
+//        connector->timeout_counter = 0;
 
     }
 
@@ -192,9 +205,11 @@ void *ardop_control_worker_thread_rx(void *conn)
     uint8_t buffer[1024];
     int counter = 0;
     bool new_cmd = false;
+    bool running = true;
 
-    while(connector->tcp_ret_ok){
-        connector->tcp_ret_ok &= tcp_read(connector->control_socket, &rcv_byte, 1);
+    while(running){
+
+        running &= tcp_read(connector->control_socket, &rcv_byte, 1);
 
         if (rcv_byte == '\r'){
             buffer[counter] = 0;
@@ -231,15 +246,15 @@ void *ardop_control_worker_thread_rx(void *conn)
                 // fprintf(stderr, "%s -- CMD NOT CONSIDERED!!\n", buffer);
             } else
             if (!memcmp(buffer, "BUFFER", strlen("BUFFER"))){
-                uint32_t buf_size;
-                sscanf( (char *) buffer, "BUFFER %u", &buf_size);
-                fprintf(stderr, "BUFFER: %u\n", buf_size);
+                sscanf( (char *) buffer, "BUFFER %u", & connector->buffer_size);
+                fprintf(stderr, "BUFFER: %u\n", connector->buffer_size);
 
-                if (buf_size != 0)
-                    connector->timeout_counter = 0;
+//                if (connector->buffer_size != 0)
+//                    connector->timeout_counter = 0;
 
+#if 1
                 // our delete messages mechanism
-                if (buf_size == 0 &&
+                if (connector->buffer_size == 0 &&
                     ring_buffer_count_bytes(&connector->in_buffer.buf) == 0 &&
                     connector->connected == true){
 
@@ -247,15 +262,17 @@ void *ardop_control_worker_thread_rx(void *conn)
                     remove_all_msg_path_queue(connector);
 
                 }
+#endif
             } else
-            if (!memcmp(buffer, "INPUTPEAKS", strlen("INPUTPEAKS"))){
-                // suppressed output
-            } else {
-                fprintf(stderr, "%s\n", buffer);
-            }
+                if (!memcmp(buffer, "INPUTPEAKS", strlen("INPUTPEAKS"))){
+                    // suppressed output
+                } else {
+                    fprintf(stderr, "%s\n", buffer);
+                }
         }
     }
 
+    fprintf(stderr, "Leaving ardop_control_worker_thread_rx... Not good.\n");
     return EXIT_SUCCESS;
 }
 
@@ -276,8 +293,8 @@ void *ardop_control_worker_thread_tx(void *conn)
 
     // we take care of timeout, here we just set the wanted timeout + 5
     memset(buffer,0,sizeof(buffer));
-    //    sprintf(buffer, "ARQTIMEOUT %d\r", connector->timeout + 5);
-    sprintf(buffer, "ARQTIMEOUT %d\r", 240);
+    sprintf(buffer, "ARQTIMEOUT %d\r", connector->timeout);
+    // sprintf(buffer, "ARQTIMEOUT %d\r", 240);
     tcp_write(connector->control_socket, (uint8_t *) buffer, strlen(buffer));
 
     memset(buffer,0,sizeof(buffer));
@@ -312,6 +329,7 @@ void *ardop_control_worker_thread_tx(void *conn)
             connector->waiting_for_connection = true;
         }
 
+#if 0
         // Logic to disconnect on timeout
         if (connector->timeout_counter >= connector->timeout &&
             connector->connected == true){
@@ -331,6 +349,18 @@ void *ardop_control_worker_thread_tx(void *conn)
             tcp_write(connector->control_socket, (uint8_t *)buffer, strlen(buffer));
 
         }
+#endif
+
+#if 0
+        // just calling buffer to help us...
+        if (connector->connected == true){
+            if (connector->timeout_counter % 2){
+                memset(buffer,0,sizeof(buffer));
+                sprintf(buffer, "BUFFER\r");
+                tcp_write(connector->control_socket, (uint8_t *)buffer, strlen(buffer));
+            }
+        }
+#endif
 
         sleep(1);
 
@@ -363,14 +393,14 @@ bool initialize_modem_ardop(rhizo_conn *connector){
     pthread_t tid4;
     pthread_create(&tid4, NULL, ardop_data_worker_thread_rx, (void *) connector);
 
-    pthread_t tid5;
-    pthread_create(&tid5, NULL, connection_timeout_thread, (void *) connector);
+//    pthread_t tid5;
+//    pthread_create(&tid5, NULL, connection_timeout_thread, (void *) connector);
 
     pthread_join(tid1, NULL);
     pthread_join(tid2, NULL);
     pthread_join(tid3, NULL);
     pthread_join(tid4, NULL);
-    pthread_join(tid5, NULL);
+//    pthread_join(tid5, NULL);
 
     return true;
 }

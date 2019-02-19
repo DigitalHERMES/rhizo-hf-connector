@@ -55,13 +55,14 @@ typedef struct{
     char output_directory[1024];
     bool ofdm_mode;
     int timeout;
+    uint32_t buffer_size;
 
 // state variables
 // C11 atomic is used here instead of a more pedantic code with mutexes and so on... 
     atomic_bool tcp_ret_ok;
     atomic_bool connected;
-    atomic_int timeout_counter;
     atomic_bool waiting_for_connection;
+    atomic_int timeout_counter;
     atomic_int safe_state; // this means green light for changing state
 
 // private
