@@ -9,7 +9,7 @@
   written to a specified directory.
 
   Support for the following TNCs are implemented: Ardop (works
-  with normal ardop or experimental the ofdm mode).
+  in both normal ardop or experimental ofdm mode) and VARA.
 
 ## Usage
 
