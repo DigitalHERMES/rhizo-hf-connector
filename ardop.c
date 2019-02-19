@@ -67,8 +67,6 @@ void *ardop_data_worker_thread_tx(void *conn)
         }
         connector->safe_state--;
 
-//        connector->timeout_counter = 0;
-
         // read header
         read_buffer(&connector->in_buffer, (uint8_t *) &buf_size, sizeof(buf_size)); // TODO: if the two parties in a connection have different endianess, we are in trouble
 
@@ -190,8 +188,6 @@ void *ardop_data_worker_thread_rx(void *conn)
             fprintf(stderr, "Ardop non-payload data rx: %s\n", buffer);
         }
 
-//        connector->timeout_counter = 0;
-
     }
 
 exit_local:
@@ -249,10 +245,6 @@ void *ardop_control_worker_thread_rx(void *conn)
                 sscanf( (char *) buffer, "BUFFER %u", & connector->buffer_size);
                 fprintf(stderr, "BUFFER: %u\n", connector->buffer_size);
 
-//                if (connector->buffer_size != 0)
-//                    connector->timeout_counter = 0;
-
-#if 1
                 // our delete messages mechanism
                 if (connector->buffer_size == 0 &&
                     ring_buffer_count_bytes(&connector->in_buffer.buf) == 0 &&
@@ -262,7 +254,7 @@ void *ardop_control_worker_thread_rx(void *conn)
                     remove_all_msg_path_queue(connector);
 
                 }
-#endif
+
             } else
                 if (!memcmp(buffer, "INPUTPEAKS", strlen("INPUTPEAKS"))){
                     // suppressed output
@@ -293,8 +285,10 @@ void *ardop_control_worker_thread_tx(void *conn)
 
     // we take care of timeout, here we just set the wanted timeout + 5
     memset(buffer,0,sizeof(buffer));
-    sprintf(buffer, "ARQTIMEOUT %d\r", connector->timeout);
-    // sprintf(buffer, "ARQTIMEOUT %d\r", 240);
+    if (connector->timeout < 240)
+        sprintf(buffer, "ARQTIMEOUT %d\r", connector->timeout);
+    else
+        sprintf(buffer, "ARQTIMEOUT %d\r", 240); // maximum timeout
     tcp_write(connector->control_socket, (uint8_t *) buffer, strlen(buffer));
 
     memset(buffer,0,sizeof(buffer));
@@ -329,7 +323,7 @@ void *ardop_control_worker_thread_tx(void *conn)
             connector->waiting_for_connection = true;
         }
 
-#if 0
+#if 0 // disabled for good
         // Logic to disconnect on timeout
         if (connector->timeout_counter >= connector->timeout &&
             connector->connected == true){
@@ -351,7 +345,7 @@ void *ardop_control_worker_thread_tx(void *conn)
         }
 #endif
 
-#if 0
+#if 0 // for debugging purposes
         // just calling buffer to help us...
         if (connector->connected == true){
             if (connector->timeout_counter % 2){
@@ -393,14 +387,10 @@ bool initialize_modem_ardop(rhizo_conn *connector){
     pthread_t tid4;
     pthread_create(&tid4, NULL, ardop_data_worker_thread_rx, (void *) connector);
 
-//    pthread_t tid5;
-//    pthread_create(&tid5, NULL, connection_timeout_thread, (void *) connector);
-
     pthread_join(tid1, NULL);
     pthread_join(tid2, NULL);
     pthread_join(tid3, NULL);
     pthread_join(tid4, NULL);
-//    pthread_join(tid5, NULL);
 
     return true;
 }
