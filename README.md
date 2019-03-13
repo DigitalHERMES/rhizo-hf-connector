@@ -15,7 +15,7 @@
 
 | Option | Description |
 | --- | --- |
-| -r [ardop,dstar,vara] | Choose modem/radio type |
+| -r [ardop,vara] | Choose modem/radio type |
 | -i input_spool_directory | Input spool directory (Messages to send) |
 | -o output_spool_directory | Output spool directory (Received messages) |
 | -c callsign | Station Callsign (Eg: PU2HFF) |
@@ -34,9 +34,9 @@ Example for running rz-hf-connector with VARA modem, on base port 8300:
 
 ### Ardop
 
-Example of invocation command for Ardop2 with an ICOM IC-7100, base port: 8515:
+Example of invocation command for Ardop with an ICOM IC-7100, base port, 8515:
 
-    $ ardopc2 8515 -c /dev/ttyUSB0 ARDOP ARDOP -k FEFE88E01C0001FD -u FEFE88E01C0000FD
+    $ ardop1ofdm 8515 -c /dev/ttyUSB0 ARDOP ARDOP -k FEFE88E01C0001FD -u FEFE88E01C0000FD
 
 With the following ALSA configuration (global-wide ALSA configuration in "/etc/asound.conf"): 
 
@@ -46,9 +46,6 @@ Associated rz-hf-connector command example:
 
     $ rz-hf-connector -r ardop -i /var/spool/outgoing_messages/ -o /var/spool/incoming_messages/ -c BB2UIT -d PP2UIT -a 127.0.0.1 -p 8515 -t 60
 
-### D-Star
-
-Not implemented yet.
 
 ## Author
 
