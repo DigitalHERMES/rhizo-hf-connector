@@ -21,7 +21,7 @@
 
 PREFIX=/usr
 CC=gcc
-CFLAGS=-g -Wall -std=gnu17 -pthread -D_FORTIFY_SOURCE=2 -fstack-protector-strong	
+CFLAGS=-g -Wall -std=gnu11 -pthread -D_FORTIFY_SOURCE=2 -fstack-protector-strong	
 
 all: rz-hf-connector
 
@@ -31,10 +31,10 @@ OBJS=$(SRCS:.c=.o)
 %.o : %.c %.h
 	gcc -c $(CFLAGS) $< -o $@
 
-rz-hf-connector : $(OBJS)
+rz-hf-connector: $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $^
 
-install:
+install: rz-hf-connector
 	install rz-hf-connector $(PREFIX)/bin
 
 doc:
