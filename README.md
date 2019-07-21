@@ -32,6 +32,8 @@ Example of invocation command of Ardop connected to an ICOM IC-7100, using base 
 
     $ ardop1ofdm 8515 -c /dev/ttyUSB0 ARDOP ARDOP -k FEFE88E01C0001FD -u FEFE88E01C0000FD
 
+ps: as a note, for an Yaesu FT-991 use " -k 5458313B -u 5458303B ".
+
 With the following ALSA configuration (global-wide ALSA configuration in "/etc/asound.conf"): 
 
     pcm.ARDOP {type rate slave {pcm "hw:1,0" rate 48000}}
