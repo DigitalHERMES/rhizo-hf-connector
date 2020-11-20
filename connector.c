@@ -47,6 +47,7 @@
 #include "vara.h"
 #include "dstar.h"
 #include "ardop.h"
+#include "serial.h"
 
 // temporary global variable to enable sockets closure
 rhizo_conn *tmp_conn = NULL;
@@ -56,6 +57,12 @@ void finish(int s){
 
     /* Do house cleaning work here */
     if (tmp_conn){
+        if (tmp_conn->serial_keying)
+        {
+            key_off(tmp_conn->serial_fd);
+            close(tmp_conn->serial_fd);
+        }
+
         if (tmp_conn->data_socket){
             shutdown(tmp_conn->data_socket, SHUT_RDWR);
             close (tmp_conn->data_socket);
@@ -96,7 +103,9 @@ bool initialize_connector(rhizo_conn *connector){
 
     connector->connected = false;
     connector->waiting_for_connection = false;
+    connector->serial_keying = false;
     connector->tcp_ret_ok = true;
+    connector->serial_fd = -1;
     connector->msg_path_queue_size = 0;
     connector->safe_state = 0;
 
@@ -116,7 +125,7 @@ int main (int argc, char *argv[])
     // Catch Ctrl+C
     signal (SIGINT,finish);
 
-    fprintf(stderr, "Rhizomatica's HF Connector version 0.2 by Rafael Diniz -  rafael (AT) rhizomatica (DOT) org\n");
+    fprintf(stderr, "Rhizomatica's HF Connector version 0.3 by Rafael Diniz -  rafael (AT) rhizomatica (DOT) org\n");
     fprintf(stderr, "License: GPLv3+\n\n");
 
     if (argc < 7)
@@ -133,14 +142,15 @@ int main (int argc, char *argv[])
         fprintf(stderr, " -a tnc_ip_address            IP address of the TNC,\n");
         fprintf(stderr, " -p tcp_base_port              TCP base port of the TNC. For VARA and ARDOP ports tcp_base_port and tcp_base_port+1 are used,\n");
         fprintf(stderr, " -t timeout                 Time to wait before disconnect when idling.\n");
-        fprintf(stderr, " -f features                Enable/Disable features. Supported features: ofdm, noofdm.\n");
+        fprintf(stderr, " -f features                Enable/Disable features. Supported features: ofdm, noofdm (ARDOP ONLY).\n");
+        fprintf(stderr, " -s serial_device           Set the serial device file path for keying the radio (VARA ONLY).\n");
         fprintf(stderr, " -h                          Prints this help.\n");
         exit(EXIT_FAILURE);
     }
 
     char *last;
     int opt;
-    while ((opt = getopt(argc, argv, "hr:i:o:c:d:p:a:t:f:")) != -1)
+    while ((opt = getopt(argc, argv, "hr:i:o:c:d:p:a:t:f:s:")) != -1)
     {
         switch (opt)
         {
@@ -186,6 +196,10 @@ int main (int argc, char *argv[])
                 connector.ofdm_mode = false;
             else
                 connector.ofdm_mode = true;
+            break;
+        case 's':
+            connector.serial_keying = true;
+            strcpy(connector.serial_path, optarg);
             break;
         default:
             goto manual;

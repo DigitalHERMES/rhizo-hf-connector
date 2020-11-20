@@ -45,6 +45,7 @@
 #include "net.h"
 #include "spool.h"
 #include "vara.h"
+#include "serial.h"
 
 void *vara_data_worker_thread_tx(void *conn)
 {
@@ -176,10 +177,17 @@ void *vara_control_worker_thread_rx(void *conn)
 
                 }
             } else
-            if (!memcmp(buffer, "PTT", strlen("PTT"))){
-                // supressed output
-                // fprintf(stderr, "%s -- CMD NOT CONSIDERED!!\n", buffer);
-            } else {
+            {
+                if (connector->serial_keying == true)
+                {
+                    if (!memcmp(buffer, "PTT ON", strlen("PTT ON")))
+                    {
+                        key_on(connector->serial_fd);
+                    }
+                    if (!memcmp(buffer, "PTT OFF", strlen("PTT OFF"))){
+                        key_off(connector->serial_fd);
+                    }
+                }
                 fprintf(stderr, "%s\n", buffer);
             }
         }
@@ -247,13 +255,28 @@ void *vara_control_worker_thread_tx(void *conn)
     return EXIT_SUCCESS;
 }
 
-bool initialize_modem_vara(rhizo_conn *connector){
+bool initialize_modem_vara(rhizo_conn *connector)
+{
     connector->tcp_ret_ok &= tcp_connect(connector->ip_address, connector->tcp_base_port, &connector->control_socket);
     connector->tcp_ret_ok &= tcp_connect(connector->ip_address, connector->tcp_base_port+1, &connector->data_socket);
 
-    if (connector->tcp_ret_ok == false){
+    if (connector->tcp_ret_ok == false)
+    {
         fprintf(stderr, "Connection to TNC failure.\n");
         return false;
+    }
+
+    if (connector->serial_keying == true)
+    {
+        connector->serial_fd = open_serial_port(connector->serial_path);
+
+        if (connector->serial_fd == -1)
+        {
+            fprintf(stderr, "Could not open serial device.\n");
+            return false;
+        }
+
+        set_fixed_baudrate("19200", connector->serial_fd);
     }
 
     // we start our control thread

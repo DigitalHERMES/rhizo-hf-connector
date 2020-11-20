@@ -51,6 +51,9 @@ typedef struct{
     int tcp_base_port;
     char ip_address[32];
     char modem_type[32];
+    bool serial_keying;
+    int serial_fd;
+    char serial_path[1024];
     char input_directory[1024];
     char output_directory[1024];
     bool ofdm_mode;
