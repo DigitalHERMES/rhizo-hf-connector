@@ -182,10 +182,10 @@ void *vara_control_worker_thread_rx(void *conn)
                 {
                     if (!memcmp(buffer, "PTT ON", strlen("PTT ON")))
                     {
-                        key_on(connector->serial_fd);
+                        key_on(connector->serial_fd, connector->radio_type);
                     }
                     if (!memcmp(buffer, "PTT OFF", strlen("PTT OFF"))){
-                        key_off(connector->serial_fd);
+                        key_off(connector->serial_fd, connector->radio_type);
                     }
                 }
                 fprintf(stderr, "%s\n", buffer);
@@ -212,6 +212,10 @@ void *vara_control_worker_thread_tx(void *conn)
 
     memset(buffer,0,sizeof(buffer));
     strcpy(buffer,"PUBLIC OFF\r");
+    connector->tcp_ret_ok &= tcp_write(connector->control_socket, (uint8_t *) buffer, strlen(buffer));
+
+    memset(buffer,0,sizeof(buffer));
+    strcpy(buffer,"BW2300\r");
     connector->tcp_ret_ok &= tcp_write(connector->control_socket, (uint8_t *) buffer, strlen(buffer));
 
     // 1Hz function

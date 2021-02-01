@@ -27,8 +27,11 @@
 #define MAX_MODEM_PATH 4096
 #define MAX_BUF_SIZE 4096
 
-void key_on(int serial_fd);
-void key_off(int serial_fd);
+#define RADIO_TYPE_ICOM 0
+#define RADIO_TYPE_UBITX 1
+
+void key_on(int serial_fd, int radio_type);
+void key_off(int serial_fd, int radio_type);
 
 int open_serial_port(char *ttyport);
 void set_fixed_baudrate(char *baudname, int target_fd);

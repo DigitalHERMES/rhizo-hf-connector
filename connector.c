@@ -59,7 +59,7 @@ void finish(int s){
     if (tmp_conn){
         if (tmp_conn->serial_keying)
         {
-            key_off(tmp_conn->serial_fd);
+            key_off(tmp_conn->serial_fd, tmp_conn->radio_type);
             close(tmp_conn->serial_fd);
         }
 
@@ -104,6 +104,7 @@ bool initialize_connector(rhizo_conn *connector){
     connector->connected = false;
     connector->waiting_for_connection = false;
     connector->serial_keying = false;
+    connector->radio_type = RADIO_TYPE_ICOM;
     connector->tcp_ret_ok = true;
     connector->serial_fd = -1;
     connector->msg_path_queue_size = 0;
@@ -144,13 +145,14 @@ int main (int argc, char *argv[])
         fprintf(stderr, " -t timeout                 Time to wait before disconnect when idling.\n");
         fprintf(stderr, " -f features                Enable/Disable features. Supported features: ofdm, noofdm (ARDOP ONLY).\n");
         fprintf(stderr, " -s serial_device           Set the serial device file path for keying the radio (VARA ONLY).\n");
+        fprintf(stderr, " -b [icom,ubitx]            Sets radio type (supported: icom or ubitx)\n");
         fprintf(stderr, " -h                          Prints this help.\n");
         exit(EXIT_FAILURE);
     }
 
     char *last;
     int opt;
-    while ((opt = getopt(argc, argv, "hr:i:o:c:d:p:a:t:f:s:")) != -1)
+    while ((opt = getopt(argc, argv, "hr:i:o:c:d:p:a:t:f:s:b:")) != -1)
     {
         switch (opt)
         {
@@ -162,6 +164,11 @@ int main (int argc, char *argv[])
             break;
         case 'd':
             strcpy(connector.remote_call_sign, optarg);
+            break;
+        case 'b':
+            // icom is the default...
+            if (!strcmp(optarg,"ubitx"))
+                connector.radio_type = RADIO_TYPE_UBITX;
             break;
         case 't':
             connector.timeout = atoi(optarg);

@@ -53,6 +53,7 @@ typedef struct{
     char modem_type[32];
     bool serial_keying;
     int serial_fd;
+    int radio_type;
     char serial_path[1024];
     char input_directory[1024];
     char output_directory[1024];
