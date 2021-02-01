@@ -284,7 +284,12 @@ bool initialize_modem_vara(rhizo_conn *connector)
             return false;
         }
 
-        set_fixed_baudrate("19200", connector->serial_fd);
+        if (connector->radio_type == RADIO_TYPE_ICOM)
+            set_fixed_baudrate("19200", connector->serial_fd);
+
+        if (connector->radio_type == RADIO_TYPE_UBITX)
+            set_fixed_baudrate("38400", connector->serial_fd);
+
     }
 
     // we start our control thread
